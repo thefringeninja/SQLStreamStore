@@ -9,6 +9,7 @@
     using SqlStreamStore.MySqlScripts;
     using SqlStreamStore.Subscriptions;
 
+    /// <inheritdoc />
     /// <summary>
     ///     Represents a MySql stream store implementation.
     /// </summary>
@@ -21,9 +22,9 @@
         public const int CurrentSchemaVersion = 2;
 
         /// <summary>
-        ///     Initializes a new instance of <see cref="MsSqlStreamStore"/>
+        ///     Initializes a new instance of <see cref="MySqlStreamStore"/>
         /// </summary>
-        /// <param name="settings">A settings class to configur this instance.</param>
+        /// <param name="settings">A settings class to configure this instance.</param>
         public MySqlStreamStore(MySqlStreamStoreSettings settings)
             :base(settings.MetadataMaxAgeCacheExpire, settings.MetadataMaxAgeCacheMaxSize,
                  settings.GetUtcNow, settings.LogName)
