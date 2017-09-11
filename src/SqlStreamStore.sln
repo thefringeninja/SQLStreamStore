@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTests", "LoadTests\Load
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlStreamStore.MySql", "SqlStreamStore.MySql\SqlStreamStore.MySql.csproj", "{AE792D22-D758-4599-9206-A943193B13A0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlStreamStore.MySql.Tests", "SqlStreamStore.MySql.Tests\SqlStreamStore.MySql.Tests.csproj", "{88FC3879-87F3-48E6-BE13-A7696D8E95CF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{AE792D22-D758-4599-9206-A943193B13A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE792D22-D758-4599-9206-A943193B13A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE792D22-D758-4599-9206-A943193B13A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88FC3879-87F3-48E6-BE13-A7696D8E95CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88FC3879-87F3-48E6-BE13-A7696D8E95CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88FC3879-87F3-48E6-BE13-A7696D8E95CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88FC3879-87F3-48E6-BE13-A7696D8E95CF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
