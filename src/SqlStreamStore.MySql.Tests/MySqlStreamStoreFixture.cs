@@ -29,7 +29,7 @@ namespace SqlStreamStore
         {
             await CreateDatabase();
 
-            var settings = new MySqlStreamStoreSettings(_localInstance?.ConnectionString)
+            var settings = new MySqlStreamStoreSettings(_localInstance?.GetConnectionString(_databaseName))
             {
                 GetUtcNow = () => GetUtcNow()
             };
@@ -40,7 +40,7 @@ namespace SqlStreamStore
         {
             await CreateDatabase();
 
-            return new MySqlStreamStore(new MySqlStreamStoreSettings(_localInstance?.ConnectionString)
+            return new MySqlStreamStore(new MySqlStreamStoreSettings(_localInstance?.GetConnectionString(_databaseName))
             {
                 GetUtcNow = () => GetUtcNow()
             });
@@ -50,7 +50,7 @@ namespace SqlStreamStore
         {
             await CreateDatabase();
 
-            var settings = new MySqlStreamStoreSettings(_localInstance?.ConnectionString)
+            var settings = new MySqlStreamStoreSettings(_localInstance?.GetConnectionString(_databaseName))
             {
                 GetUtcNow = () => GetUtcNow()
             };

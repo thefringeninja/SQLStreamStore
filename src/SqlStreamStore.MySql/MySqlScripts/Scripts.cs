@@ -28,9 +28,7 @@
 
         internal string GetStreamMessageBeforeCreatedCount => GetScript(nameof(GetStreamMessageBeforeCreatedCount));
 
-        internal string CreateSchema => GetScript(nameof(CreateSchema));
-
-        internal string CreateSchema_v1 => GetScript(nameof(CreateSchema_v1));
+        internal string CreateDatabase => GetScript(nameof(CreateDatabase));
 
         internal string GetSchemaVersion => GetScript(nameof(GetSchemaVersion));
 
