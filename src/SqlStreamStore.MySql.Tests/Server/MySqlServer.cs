@@ -129,14 +129,14 @@
             }
         }
 
-        public MySqlConnection CreateConnection()
+        public MySqlConnection CreateConnection(string databaseName = null)
         {
             if(!_started)
             {
                 throw new InvalidOperationException("MySqlServer must be started first.");
             }
 
-            return new MySqlConnection(ConnectionString);
+            return new MySqlConnection(databaseName == null ? ConnectionString : GetConnectionString(databaseName));
         }
 
         public void Dispose()

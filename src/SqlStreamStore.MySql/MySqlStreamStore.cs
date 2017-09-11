@@ -53,7 +53,17 @@
         {
             GuardAgainstDisposed();
 
-            throw new NotSupportedException("MySQL doesn't know what a schema is. Do something else.");
+            using(var connection = _createConnection())
+            {
+                await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
+
+                using(var command = new MySqlCommand(_scripts.CreateDatabase, connection))
+                {
+                    await command
+                        .ExecuteNonQueryAsync(cancellationToken)
+                        .NotOnCapturedContext();
+                }
+            }
         }
 
         /// <summary>
@@ -103,7 +113,7 @@
             }
         }
 
-        public async Task<int> GetmessageCount(
+        public async Task<int> GetMessageCount(
             string streamId,
             DateTime createdBefore,
             CancellationToken cancellationToken = default(CancellationToken))
