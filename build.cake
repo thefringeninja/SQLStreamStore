@@ -66,6 +66,7 @@ Task("DotNetPack")
     
 	DotNetCorePack("./src/SqlStreamStore", dotNetCorePackSettings);
 	DotNetCorePack("./src/SqlStreamStore.MsSql", dotNetCorePackSettings);
+	DotNetCorePack("./src/SqlStreamStore.MySql", dotNetCorePackSettings);
 });
 
 Task("Default")
