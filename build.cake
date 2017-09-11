@@ -16,19 +16,19 @@ Task("RestorePackages")
     .IsDependentOn("Clean")
     .Does(() =>
 {
-	DotNetCoreRestore(solution);
+    DotNetCoreRestore(solution);
 });
 
 Task("Build")
     .IsDependentOn("RestorePackages")
     .Does(() =>
 {
-	var settings = new DotNetCoreBuildSettings
-	{
-		Configuration = configuration
-	};
+    var settings = new DotNetCoreBuildSettings
+    {
+        Configuration = configuration
+    };
 
-	DotNetCoreBuild(solution, settings);
+    DotNetCoreBuild(solution, settings);
 });
 
 Task("RunTests")
@@ -63,14 +63,14 @@ Task("DotNetPack")
     var dotNetCorePackSettings   = new DotNetCorePackSettings
     {
         OutputDirectory = artifactsDir,
-		NoBuild = true,
-		Configuration = configuration,
+        NoBuild = true,
+        Configuration = configuration,
         VersionSuffix = versionSuffix
     };
     
-	DotNetCorePack("./src/SqlStreamStore", dotNetCorePackSettings);
-	DotNetCorePack("./src/SqlStreamStore.MsSql", dotNetCorePackSettings);
-	DotNetCorePack("./src/SqlStreamStore.MySql", dotNetCorePackSettings);
+    DotNetCorePack("./src/SqlStreamStore", dotNetCorePackSettings);
+    DotNetCorePack("./src/SqlStreamStore.MsSql", dotNetCorePackSettings);
+    DotNetCorePack("./src/SqlStreamStore.MySql", dotNetCorePackSettings);
 });
 
 Task("Default")
