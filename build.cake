@@ -3,6 +3,7 @@
 var target          = Argument("target", "Default");
 var configuration   = Argument("configuration", "Release");
 var artifactsDir    = Directory("./artifacts");
+var srcDir          = Directory("./src");
 var solution        = "./src/SqlStreamStore.sln";
 var buildNumber     = string.IsNullOrWhiteSpace(EnvironmentVariable("BUILD_NUMBER")) ? "0" : EnvironmentVariable("BUILD_NUMBER");
 
@@ -17,6 +18,8 @@ Task("RestorePackages")
     .Does(() =>
 {
     DotNetCoreRestore(solution);
+
+    InstallMySqlD("5.6.37");
 });
 
 Task("Build")
@@ -78,3 +81,41 @@ Task("Default")
     .IsDependentOn("DotNetPack");
 
 RunTarget(target);
+
+void InstallMySqlD(string v) {
+    var installDir     = srcDir + Directory("SqlStreamStore.MySql.Tests/.mysql");
+    var mysqlDir       = installDir + Directory($"mysql-{v}-winx64/bin");
+    var mysqldPath     = mysqlDir + File("mysqld.exe");
+    var installPath    = installDir + File("mysql.zip");
+    var version        = Version.Parse(v);
+
+    EnsureDirectoryExists(mysqlDir);
+
+    if (FileExists(mysqldPath)) {
+        Information("Checking MySQL version...");
+        using (var process = StartAndReturnProcess(mysqldPath, new ProcessSettings {
+            Arguments = "--version",
+            RedirectStandardOutput = true
+        })) {
+            process.WaitForExit();
+
+            var stdout = process.GetStandardOutput().FirstOrDefault();
+
+            Information(stdout);
+
+            if ((stdout ?? string.Empty).Contains(v)) {
+                Information($"MySQL {v} found; skipping installation.");
+
+                return;
+            }
+
+            DeleteDirectory(mysqlDir, true);
+        }
+    }
+
+    var mysqld = $"https://dev.mysql.com/get/Downloads/MySQL-{version.Major}.{version.Minor}/mysql-{version.Major}.{version.Minor}.{version.Build}-winx64.zip";
+
+    DownloadFile(mysqld, installPath);
+
+    Unzip(installPath, installDir);
+}
