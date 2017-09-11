@@ -52,68 +52,7 @@
         {
             GuardAgainstDisposed();
 
-            using(var connection = _createConnection())
-            {
-                await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
-
-                if(_scripts.Schema != "dbo")
-                {
-                    using(var command = new MySqlCommand($@"
-                        IF NOT EXISTS (
-                        SELECT  schema_name
-                        FROM    information_schema.schemata
-                        WHERE   schema_name = '{_scripts.Schema}' )
-
-                        BEGIN
-                        EXEC sp_executesql N'CREATE SCHEMA {_scripts.Schema}'
-                        END", connection))
-                    {
-                        await command
-                            .ExecuteNonQueryAsync(cancellationToken)
-                            .NotOnCapturedContext();
-                    }
-                }
-
-                using (var command = new MySqlCommand(_scripts.CreateSchema, connection))
-                {
-                    await command.ExecuteNonQueryAsync(cancellationToken)
-                        .NotOnCapturedContext();
-                }
-            }
-        }
-
-        internal async Task CreateSchema_v1_ForTests(CancellationToken cancellationToken = default(CancellationToken))
-        {
-            GuardAgainstDisposed();
-
-            using (var connection = _createConnection())
-            {
-                await connection.OpenAsync(cancellationToken).NotOnCapturedContext();
-
-                if (_scripts.Schema != "dbo")
-                {
-                    using (var command = new MySqlCommand($@"
-                        IF NOT EXISTS (
-                        SELECT  schema_name
-                        FROM    information_schema.schemata
-                        WHERE   schema_name = '{_scripts.Schema}' )
-
-                        BEGIN
-                        EXEC sp_executesql N'CREATE SCHEMA {_scripts.Schema}'
-                        END", connection))
-                    {
-                        await command
-                            .ExecuteNonQueryAsync(cancellationToken)
-                            .NotOnCapturedContext();
-                    }
-                }
-
-                using (var command = new MySqlCommand(_scripts.CreateSchema_v1, connection))
-                {
-                    await command.ExecuteNonQueryAsync(cancellationToken)
-                        .NotOnCapturedContext();
-                }
-            }
+            throw new NotSupportedException("MySQL doesn't know what a schema is. Do something else.");
         }
 
         /// <summary>

@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFrameworks>netcoreapp2.0</TargetFrameworks>
     <AssemblyName>SqlStreamStore.MySql.Tests</AssemblyName>
@@ -8,23 +7,28 @@
     <RootNamespace>SqlStreamStore</RootNamespace>
     <NoWarn>1701;1702;1705;1591</NoWarn>
   </PropertyGroup>
-
   <ItemGroup>
     <ProjectCapability Include="ShowFilesOutsideOfProject" />
     <Compile Include="..\SqlStreamStore.AcceptanceTests\*.cs" />
   </ItemGroup>
-
   <ItemGroup>
     <None Remove="SqlStreamStore.MySql.Tests.v3.ncrunchproject" />
   </ItemGroup>
-
+  <ItemGroup>
+    <Content Include=".mysql\mysql-5.6.37-winx64\bin\mysqld.exe">
+      <Link>.mysql\mysqld.exe</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include=".mysql\mysql-5.6.37-winx64\share\english\errmsg.sys">
+      <Link>.mysql\errmsg.sys</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SqlStreamStore.MySql\SqlStreamStore.MySql.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0" />
-    <!-- <PackageReference Include="System.Runtime.Serialization.Primitives" Version="4.3.0" /> -->
     <PackageReference Include="Shouldly" Version="2.8.3" />
     <PackageReference Include="Serilog" Version="2.5.0" />
     <PackageReference Include="Serilog.Sinks.Observable" Version="2.0.1" />
@@ -35,5 +39,4 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <DotNetCliToolReference Include="Microsoft.DotNet.Watcher.Tools" Version="2.0.0" />
   </ItemGroup>
-
 </Project>

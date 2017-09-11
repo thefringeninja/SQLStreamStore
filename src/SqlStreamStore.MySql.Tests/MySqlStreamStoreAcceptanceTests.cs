@@ -11,7 +11,7 @@
     {
         private StreamStoreAcceptanceTestFixture GetFixture(string schema = "foo")
         {
-            return new MySqlStreamStoreFixture(schema);
+            return new MySqlStreamStoreFixture(schema, _testOutputHelper);
         }
 
         private IDisposable CaptureLogs(ITestOutputHelper testOutputHelper)
@@ -22,7 +22,7 @@
         [Fact]
         public async Task Can_use_multiple_schemas()
         {
-            using(var fixture = new MySqlStreamStoreFixture("dbo"))
+            using(var fixture = new MySqlStreamStoreFixture("dbo", _testOutputHelper))
             {
                 using(var dboStore = await fixture.GetStreamStore())
                 {
@@ -48,7 +48,7 @@
         [Fact]
         public async Task Can_get_stream_message_count_with_created_before_date()
         {
-            using (var fixture = new MySqlStreamStoreFixture("dbo"))
+            using (var fixture = new MySqlStreamStoreFixture("dbo", _testOutputHelper))
             {
                 using (var store = await fixture.GetMySqlStreamStore())
                 {
@@ -77,7 +77,7 @@
         [Theory, InlineData("dbo"), InlineData("myschema")]
         public async Task Can_call_initialize_repeatably(string schema)
         {
-            using(var fixture = new MySqlStreamStoreFixture(schema))
+            using(var fixture = new MySqlStreamStoreFixture(schema, _testOutputHelper))
             {
                 using(var store = await fixture.GetMySqlStreamStore())
                 {
@@ -90,7 +90,7 @@
         [Fact]
         public async Task Can_drop_all()
         {
-            using (var fixture = new MySqlStreamStoreFixture("dbo"))
+            using (var fixture = new MySqlStreamStoreFixture("dbo", _testOutputHelper))
             {
                 using (var store = await fixture.GetMySqlStreamStore())
                 {
