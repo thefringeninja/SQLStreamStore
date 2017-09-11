@@ -10,8 +10,6 @@
     /// </summary>
     public class MySqlStreamStoreSettings
     {
-        private string _schema = "dbo";
-
         /// <summary>
         ///     Initialized a new instance of <see cref="MySqlStreamStoreSettings"/>.
         /// </summary>
@@ -34,23 +32,6 @@
         /// </summary>
         public CreateStreamStoreNotifier CreateStreamStoreNotifier { get; set; } =
             store => new PollingStreamStoreNotifier(store);
-
-        /// <summary>
-        ///     MsSqlStream store supports stores in a single database through
-        ///     the useage of schema. This is useful if you want to contain
-        ///     multiple bounded contexts in a single database. Alternative is
-        ///     use a database per bounded context, which may be more appropriate
-        ///     for larger stores.
-        /// </summary>
-        public string Schema
-        {
-            get => _schema;
-            set
-            {
-                Ensure.That(value, nameof(Schema)).IsNotNullOrWhiteSpace();
-                _schema = value;
-            }
-        }
 
         /// <summary>
         ///     To help with perf, the max age of messages in a stream

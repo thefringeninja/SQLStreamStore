@@ -40,15 +40,15 @@
                     }
                     return settings.CreateStreamStoreNotifier.Invoke(this);
                 });
-            _scripts = new Scripts(settings.Schema);
+            _scripts = new Scripts();
         }
 
         /// <summary>
-        ///     Creates a scheme to hold stream
+        ///     Creates a database to hold streams
         /// </summary>
         /// <param name="cancellationToken">The cancellation instruction.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        public async Task CreateSchema(CancellationToken cancellationToken = default(CancellationToken))
+        public async Task CreateDatabase(CancellationToken cancellationToken = default(CancellationToken))
         {
             GuardAgainstDisposed();
 

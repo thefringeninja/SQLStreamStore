@@ -14,14 +14,12 @@ namespace SqlStreamStore
     {
         private static int s_nextPort = MySqlServer.DefaultPort;
 
-        private readonly string _schema;
         private readonly ITestOutputHelper _testOutputHelper;
         private readonly string _databaseName;
         private MySqlServer _localInstance;
 
-        public MySqlStreamStoreFixture(string schema, ITestOutputHelper testOutputHelper)
+        public MySqlStreamStoreFixture(ITestOutputHelper testOutputHelper)
         {
-            _schema = schema;
             _testOutputHelper = testOutputHelper;
 
             _databaseName = $"StreamStoreTests-{Guid.NewGuid():n}";
@@ -31,20 +29,11 @@ namespace SqlStreamStore
         {
             await CreateDatabase();
 
-            return await GetStreamStore(_schema);
-        }
-
-        public async Task<IStreamStore> GetStreamStore(string schema)
-        {
             var settings = new MySqlStreamStoreSettings(_localInstance?.ConnectionString)
             {
-                Schema = schema,
                 GetUtcNow = () => GetUtcNow()
             };
-            var store = new MySqlStreamStore(settings);
-            await store.CreateSchema();
-
-            return store;
+            return new MySqlStreamStore(settings);
         }
 
         public async Task<MySqlStreamStore> GetUninitializedStreamStore()
@@ -53,7 +42,6 @@ namespace SqlStreamStore
 
             return new MySqlStreamStore(new MySqlStreamStoreSettings(_localInstance?.ConnectionString)
             {
-                Schema = _schema,
                 GetUtcNow = () => GetUtcNow()
             });
         }
@@ -64,12 +52,11 @@ namespace SqlStreamStore
 
             var settings = new MySqlStreamStoreSettings(_localInstance?.ConnectionString)
             {
-                Schema = _schema,
                 GetUtcNow = () => GetUtcNow()
             };
 
             var store = new MySqlStreamStore(settings);
-            await store.CreateSchema();
+            await store.CreateDatabase();
 
             return store;
         }

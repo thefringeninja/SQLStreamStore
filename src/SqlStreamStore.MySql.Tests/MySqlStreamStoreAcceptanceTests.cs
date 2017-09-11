@@ -9,9 +9,9 @@
 
     public partial class StreamStoreAcceptanceTests
     {
-        private StreamStoreAcceptanceTestFixture GetFixture(string schema = "foo")
+        private StreamStoreAcceptanceTestFixture GetFixture()
         {
-            return new MySqlStreamStoreFixture(schema, _testOutputHelper);
+            return new MySqlStreamStoreFixture(_testOutputHelper);
         }
 
         private IDisposable CaptureLogs(ITestOutputHelper testOutputHelper)
@@ -20,35 +20,9 @@
         }
 
         [Fact]
-        public async Task Can_use_multiple_schemas()
-        {
-            using(var fixture = new MySqlStreamStoreFixture("dbo", _testOutputHelper))
-            {
-                using(var dboStore = await fixture.GetStreamStore())
-                {
-                    using(var barStore = await fixture.GetStreamStore("bar"))
-                    {
-                        await dboStore.AppendToStream("stream-1",
-                                ExpectedVersion.NoStream,
-                                CreateNewStreamMessages(1, 2));
-                        await barStore.AppendToStream("stream-1",
-                                ExpectedVersion.NoStream,
-                                CreateNewStreamMessages(1, 2));
-
-                        var dboHeadPosition = await dboStore.ReadHeadPosition();
-                        var fooHeadPosition = await dboStore.ReadHeadPosition();
-
-                        dboHeadPosition.ShouldBe(1);
-                        fooHeadPosition.ShouldBe(1);
-                    }
-                }
-            }
-        }
-
-        [Fact]
         public async Task Can_get_stream_message_count_with_created_before_date()
         {
-            using (var fixture = new MySqlStreamStoreFixture("dbo", _testOutputHelper))
+            using (var fixture = new MySqlStreamStoreFixture(_testOutputHelper))
             {
                 using (var store = await fixture.GetMySqlStreamStore())
                 {
@@ -74,15 +48,15 @@
             }
         }
 
-        [Theory, InlineData("dbo"), InlineData("myschema")]
-        public async Task Can_call_initialize_repeatably(string schema)
+        [Fact]
+        public async Task Can_call_initialize_repeatably()
         {
-            using(var fixture = new MySqlStreamStoreFixture(schema, _testOutputHelper))
+            using(var fixture = new MySqlStreamStoreFixture(_testOutputHelper))
             {
                 using(var store = await fixture.GetMySqlStreamStore())
                 {
-                    await store.CreateSchema();
-                    await store.CreateSchema();
+                    await store.CreateDatabase();
+                    await store.CreateDatabase();
                 }
             }
         }
@@ -90,7 +64,7 @@
         [Fact]
         public async Task Can_drop_all()
         {
-            using (var fixture = new MySqlStreamStoreFixture("dbo", _testOutputHelper))
+            using (var fixture = new MySqlStreamStoreFixture(_testOutputHelper))
             {
                 using (var store = await fixture.GetMySqlStreamStore())
                 {
