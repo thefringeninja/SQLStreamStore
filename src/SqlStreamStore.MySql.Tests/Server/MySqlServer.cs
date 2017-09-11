@@ -4,7 +4,6 @@
     using System.Data;
     using System.Diagnostics;
     using System.IO;
-    using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
     using MySql.Data.MySqlClient;
@@ -51,6 +50,7 @@
                 $@"--lc-messages-dir=""{mysqlDirectory}""",
                 $@"--datadir=""{_dataDirectory}""",
                 "--skip-grant-tables",
+                "--bind-address=127.0.0.1",
                 $"--port={ServerPort}",
                 "--innodb_fast_shutdown=2",
                 "--innodb_doublewrite=OFF",
@@ -152,13 +152,18 @@
 
             _process?.Dispose();
 
-            try
+            var stopwatch = Stopwatch.StartNew();
+            while(stopwatch.ElapsedMilliseconds < 1000)
             {
-                Directory.Delete(_dataDirectory);
-            }
-            catch(Exception ex)
-            {
-                _testOutputHelper.WriteLine($"{ex}");
+                try
+                {
+                    Directory.Delete(_dataDirectory, true);
+                    break;
+                }
+                catch(IOException)
+                {
+                    Thread.Sleep(100);
+                }
             }
         }
    }

@@ -5,7 +5,6 @@
     using System.Threading.Tasks;
     using SqlStreamStore.Streams;
     using SqlStreamStore.Infrastructure;
-    using StreamStoreStore.Json;
 
     public partial class MySqlStreamStore
     {
