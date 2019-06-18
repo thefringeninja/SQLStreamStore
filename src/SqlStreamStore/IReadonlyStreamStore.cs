@@ -1,6 +1,7 @@
 ﻿namespace SqlStreamStore
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
     using SqlStreamStore.Streams;
@@ -18,7 +19,7 @@
         ///     The position to start reading from. Use <see cref="Position.Start"/> to start from the beginning.
         ///     Note: messages that have expired will be filtered out.
         /// </param>
-        /// <param name="maxCount">
+        /// <param name="pageSize">
         ///     The maximum number of messages to read (int.MaxValue is a bad idea).
         /// </param>
         /// <param name="prefetchJsonData">
@@ -32,9 +33,9 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        Task<ReadAllPage> ReadAllForwards(
+        IAsyncEnumerable<StreamMessage> ReadAllForwards(
             long fromPositionInclusive,
-            int maxCount,
+            int pageSize,
             bool prefetchJsonData = true,
             CancellationToken cancellationToken = default);
 
@@ -59,7 +60,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        Task<ReadAllPage> ReadAllBackwards(
+        IAsyncEnumerable<StreamMessage> ReadAllBackwards(
             long fromPositionInclusive,
             int maxCount,
             bool prefetchJsonData = true,

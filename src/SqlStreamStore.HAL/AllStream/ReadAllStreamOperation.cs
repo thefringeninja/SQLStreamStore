@@ -1,5 +1,6 @@
 namespace SqlStreamStore.AllStream
 {
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Http;
@@ -66,7 +67,7 @@ namespace SqlStreamStore.AllStream
         public bool IsUriCanonical { get; }
         public PathString Path { get; }
 
-        public Task<ReadAllPage> Invoke(IStreamStore streamStore, CancellationToken ct)
+        public IAsyncEnumerable<StreamMessage> Invoke(IStreamStore streamStore, CancellationToken ct)
             => ReadDirection == Constants.ReadDirection.Forwards
                 ? streamStore.ReadAllForwards(_fromPositionInclusive, _maxCount, EmbedPayload, ct)
                 : streamStore.ReadAllBackwards(_fromPositionInclusive, _maxCount, EmbedPayload, ct);

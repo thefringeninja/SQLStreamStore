@@ -221,8 +221,8 @@
                 await subscription.Started;
                 await AppendMessages(store, streamId1, 2);
 
-                var allMessagesPage = await store.ReadAllForwards(0, 30);
-                foreach(var streamMessage in allMessagesPage.Messages)
+                var messages = await store.ReadAllForwards(0, 30).ToArrayAsync();
+                foreach(var streamMessage in messages)
                 {
                     TestOutputHelper.WriteLine(streamMessage.ToString());
                 }
@@ -692,7 +692,7 @@
                 });
             subscription.MaxCountPerRead = 10;
 
-            Func<Task> act = async () => await caughtUp.Task.WithTimeout(1000);
+            Func<Task> act = async () => await caughtUp.Task.WithTimeout();
 
             await act.ShouldThrowAsync<TimeoutException>();
 

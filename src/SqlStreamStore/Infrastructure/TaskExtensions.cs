@@ -1,5 +1,6 @@
 ﻿namespace SqlStreamStore.Infrastructure
 {
+    using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using System.Threading.Tasks;
 
@@ -23,5 +24,13 @@
         {
             return task.ConfigureAwait(false);
         }
+        
+        /// <summary>
+        /// ConfigureAwait(false)
+        /// </summary>
+        public static ConfiguredCancelableAsyncEnumerable<T> NotOnCapturedContext<T>(this IAsyncEnumerable<T> enumerable)
+        {
+            return enumerable.ConfigureAwait(false);
+        } 
     }
 }

@@ -124,11 +124,11 @@ namespace SqlStreamStore
                 .SetStreamMetadata(streamId2, maxAge: 30, metadataJson: "meta");
 
             // Act
-            var allMessagesPage = await store.ReadAllForwards(Position.Start, 20);
+            var messages = await store.ReadAllForwards(Position.Start, 20).ToArrayAsync();
 
             // Assert
-            allMessagesPage.Messages.Count(message => message.StreamId == streamId1).ShouldBe(2);
-            allMessagesPage.Messages.Count(message => message.StreamId == streamId2).ShouldBe(4);
+            messages.Count(message => message.StreamId == streamId1).ShouldBe(2);
+            messages.Count(message => message.StreamId == streamId2).ShouldBe(4);
         }
 
         [Fact, Trait("Category", "StreamMetadata")]
@@ -158,11 +158,11 @@ namespace SqlStreamStore
                 .SetStreamMetadata(streamId2, maxAge: 30, metadataJson: "meta");
 
             // Act
-            var allMessagesPage = await store.ReadAllBackwards(Position.End, 20);
+            var messages = await store.ReadAllBackwards(Position.End, 20).ToArrayAsync();
 
             // Assert
-            allMessagesPage.Messages.Count(message => message.StreamId == streamId1).ShouldBe(2);
-            allMessagesPage.Messages.Count(message => message.StreamId == streamId2).ShouldBe(4);
+            messages.Count(message => message.StreamId == streamId1).ShouldBe(2);
+            messages.Count(message => message.StreamId == streamId2).ShouldBe(4);
         }
     }
 }

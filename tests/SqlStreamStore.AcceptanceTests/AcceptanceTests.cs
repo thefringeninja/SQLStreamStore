@@ -52,7 +52,10 @@
         {
             store.Dispose();
 
-            Func<Task> act = () => store.ReadAllForwards(Position.Start, 10);
+            Func<Task> act = async () =>
+            {
+                await foreach(var _ in store.ReadAllForwards(Position.Start, 10)) { }
+            };
 
             await act.ShouldThrowAsync<ObjectDisposedException>();
         }

@@ -63,7 +63,7 @@
                 Output.WriteLine("");
                 Output.WriteLine($"> {count} messages written in {stopwatch.Elapsed} ({rate} m/s)");
 
-                var streampage = await streamStore.ReadStreamForwards(streamId, StreamVersion.Start, maxCount + 1, ct);
+                var streampage = await streamStore.ReadStreamForwards(streamId, StreamVersion.Start, maxCount + 1, false, ct);
 
                 Output.WriteLine($"> Stream Message length: {streampage.Messages.Length}");
             }

@@ -167,6 +167,7 @@
                     StreamId,
                     StreamVersion.End,
                     1,
+                    false,
                     _disposed.Token).NotOnCapturedContext();
             }
             catch (ObjectDisposedException)

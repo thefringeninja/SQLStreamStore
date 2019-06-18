@@ -1,5 +1,6 @@
 ﻿namespace SqlStreamStore
 {
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
     using SqlStreamStore.Streams;
@@ -29,7 +30,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        public static Task<ReadAllPage> ReadAllForwards(
+        public static IAsyncEnumerable<StreamMessage> ReadAllForwards(
             this IReadonlyStreamStore readonlyStreamStore,
             long fromPositionInclusive,
             int maxCount,
@@ -61,7 +62,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        public static Task<ReadAllPage> ReadAllBackwards(
+        public static IAsyncEnumerable<StreamMessage> ReadAllBackwards(
             this IReadonlyStreamStore readonlyStreamStore,
             long fromPositionInclusive,
             int maxCount,
