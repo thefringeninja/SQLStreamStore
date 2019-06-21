@@ -1,6 +1,7 @@
 ﻿namespace SqlStreamStore
 {
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
     using Shouldly;
     using SqlStreamStore.Streams;
@@ -270,9 +271,10 @@
 
             result.CurrentVersion.ShouldBe(2);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 4);
-            page.Messages.Length.ShouldBe(3);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 4)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(3);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -285,9 +287,10 @@
             result.CurrentVersion.ShouldBe(0);
             result.CurrentPosition.ShouldBeGreaterThanOrEqualTo(fixture.MinPosition);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 2);
-            page.Messages.Length.ShouldBe(1);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 2)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(1);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -296,9 +299,10 @@
             const string streamId = "stream-1";
             await store.AppendToStream(streamId, ExpectedVersion.NoStream, new NewStreamMessage[0]);
 
-            var page = await store.ReadStreamForwards(streamId, StreamVersion.Start, 2);
+            var messages = await store.ReadStreamForwards(streamId, StreamVersion.Start, 2)
+                .ToArrayAsync();
 
-            page.Messages.Length.ShouldBe(0);
+            messages.Length.ShouldBe(0);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -323,9 +327,10 @@
             await store
                 .AppendToStream(streamId, ExpectedVersion.Any, CreateNewStreamMessages(1, 2, 3));
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(3);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(3);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -345,9 +350,10 @@
             await store
                 .AppendToStream(streamId, ExpectedVersion.Any, CreateNewStreamMessages(2));
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(2);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(2);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -361,9 +367,10 @@
             await store
                 .AppendToStream(streamId, ExpectedVersion.Any, CreateNewStreamMessages(1));
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(1);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(1);
         }
 
 
@@ -384,9 +391,10 @@
             result2.CurrentVersion.ShouldBe(2);
             result2.CurrentPosition.ShouldBe(result1.CurrentPosition);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(3);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(3);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -406,9 +414,10 @@
             result2.CurrentVersion.ShouldBe(0);
             result2.CurrentPosition.ShouldBe(result1.CurrentPosition);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 3);
-            page.Messages.Length.ShouldBe(1);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 3)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(1);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -422,9 +431,10 @@
             await store
                 .AppendToStream(streamId, ExpectedVersion.Any, CreateNewStreamMessages(1, 2));
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(3);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(3);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -457,9 +467,10 @@
             result2.CurrentVersion.ShouldBe(2);
             result2.CurrentPosition.ShouldBe(result1.CurrentPosition);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(3);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(3);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -478,9 +489,10 @@
             result2.CurrentVersion.ShouldBe(2);
             result2.CurrentPosition.ShouldBe(result1.CurrentPosition);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 4);
-            page.Messages.Length.ShouldBe(3);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 4)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(3);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -494,9 +506,10 @@
             await store
                 .AppendToStream(streamId, ExpectedVersion.Any, CreateNewStreamMessages(4, 5, 6));
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(6);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(6);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -514,9 +527,10 @@
             result2.CurrentVersion.ShouldBe(5);
             result2.CurrentPosition.ShouldBeGreaterThanOrEqualTo(result1.CurrentPosition + 3L);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 10);
-            page.Messages.Length.ShouldBe(6);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 10)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(6);
         }
 
 
@@ -535,9 +549,10 @@
             result2.CurrentVersion.ShouldBe(3);
             result2.CurrentPosition.ShouldBeGreaterThanOrEqualTo(result1.CurrentPosition + 1L);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 5);
-            page.Messages.Length.ShouldBe(4);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 5)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(4);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -555,9 +570,10 @@
             result2.CurrentVersion.ShouldBe(3);
             result2.CurrentPosition.ShouldBeGreaterThanOrEqualTo(result1.CurrentPosition + 1L);
 
-            var page = await store
-                .ReadStreamForwards(streamId, StreamVersion.Start, 5);
-            page.Messages.Length.ShouldBe(4);
+            var messages = await store
+                .ReadStreamForwards(streamId, StreamVersion.Start, 5)
+                .ToArrayAsync();
+            messages.Length.ShouldBe(4);
         }
 
         [Fact, Trait("Category", "AppendStream")]
@@ -620,14 +636,9 @@
             const string streamId = "stream-1";
             await store.AppendToStream(streamId, expectedVersion, new NewStreamMessage[0]);
 
-            var page = await store.ReadStreamForwards(streamId, StreamVersion.Start, 1);
+            var stream = await store.ReadStreamForwards(streamId, StreamVersion.Start, 1);
 
-            page.Status.ShouldBe(PageReadStatus.Success);
-            page.FromStreamVersion.ShouldBe(0);
-            page.LastStreamVersion.ShouldBe(-1);
-            page.LastStreamPosition.ShouldBe(-1);
-            page.NextStreamVersion.ShouldBe(0);
-            page.IsEnd.ShouldBe(true);
+            stream.Status.ShouldBe(PageReadStatus.Success);
         }
 
         [Theory, Trait("Category", "AppendStream")]

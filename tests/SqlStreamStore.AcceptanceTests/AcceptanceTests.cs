@@ -54,7 +54,7 @@
 
             Func<Task> act = async () =>
             {
-                await foreach(var _ in store.ReadAllForwards(Position.Start, 10)) { }
+                await foreach(var _ in await store.ReadAllForwards(Position.Start, 10)) { }
             };
 
             await act.ShouldThrowAsync<ObjectDisposedException>();

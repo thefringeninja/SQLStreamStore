@@ -12,7 +12,6 @@
         [Fact, Trait("Category", "ReadAll")]
         public async Task Can_read_all_forwards()
         {
-            
             await store.AppendToStream("stream-1", ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
             await store.AppendToStream("stream-2", ExpectedVersion.NoStream, CreateNewStreamMessages(4, 5, 6));
             var expectedMessages = new[]
@@ -26,10 +25,10 @@
             };
 
             var messages = await store.ReadAllForwards(Position.Start, 4).ToArrayAsync();
-            
+
             messages.Length.ShouldBe(expectedMessages.Length);
 
-            for (int i = 0; i < messages.Length; i++)
+            for(int i = 0; i < messages.Length; i++)
             {
                 var message = messages[i];
                 var expectedMessage = expectedMessages[i];
@@ -82,7 +81,7 @@
 
             await store.DeleteStream("stream-1");
 
-            foreach (var streamMessage in messages)
+            foreach(var streamMessage in messages)
             {
                 (await streamMessage.GetJsonData()).ShouldBeNull();
             }
@@ -152,8 +151,8 @@
         }*/
 
         [Theory, Trait("Category", "ReadAll")]
-        [InlineData(3, 0, 3, 3, 0, 3)]  // Read entire store
-        [InlineData(3, 0, 4, 3, 0, 3)]  // Read entire store
+        [InlineData(3, 0, 3, 3, 0, 3)] // Read entire store
+        [InlineData(3, 0, 4, 3, 0, 3)] // Read entire store
         [InlineData(3, 0, 2, 2, 0, 2)]
         [InlineData(3, 1, 2, 2, 1, 3)]
         [InlineData(3, 2, 1, 1, 2, 3)]
@@ -171,9 +170,9 @@
                 ExpectedVersion.NoStream,
                 CreateNewStreamMessageSequence(1, numberOfSeedMessages));
 
-            var messages = await store.ReadAllForwards(fromPosition, maxCount).Take(maxCount).ToArrayAsync();
+            var messages = (await store.ReadAllForwards(fromPosition, maxCount).ToArrayAsync()).Take(maxCount);
 
-            messages.Length.ShouldBe(expectedCount);
+            messages.Count().ShouldBe(expectedCount);
         }
 
         [Theory, Trait("Category", "ReadAll")]
@@ -200,9 +199,9 @@
                     CreateNewStreamMessageSequence(1, numberOfSeedMessages));
             }
 
-            var messages = await store.ReadAllBackwards(fromPosition, maxCount).Take(expectedCount).ToArrayAsync();
+            var messages = (await store.ReadAllBackwards(fromPosition, maxCount).ToArrayAsync()).Take(expectedCount);
 
-            messages.Length.ShouldBe(expectedCount);            
+            messages.Count().ShouldBe(expectedCount);
         }
 
         [Theory, Trait("Category", "ReadAll")]
@@ -213,7 +212,7 @@
             await store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1));
 
             var result = await store.ReadAllForwards(Position.Start, 1).ToArrayAsync();
-            
+
             Assert.Equal(streamId, result[0].StreamId);
         }
 
@@ -225,7 +224,7 @@
             await store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1));
 
             var result = await store.ReadAllBackwards(Position.End, 1).ToArrayAsync();
-            
+
             Assert.Equal(streamId, result[0].StreamId);
         }
     }

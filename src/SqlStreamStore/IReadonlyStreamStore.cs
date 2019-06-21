@@ -33,7 +33,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        IAsyncEnumerable<StreamMessage> ReadAllForwards(
+        Task<IAsyncEnumerable<StreamMessage>> ReadAllForwards(
             long fromPositionInclusive,
             int pageSize,
             bool prefetchJsonData = true,
@@ -60,7 +60,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        IAsyncEnumerable<StreamMessage> ReadAllBackwards(
+        Task<IAsyncEnumerable<StreamMessage>> ReadAllBackwards(
             long fromPositionInclusive,
             int maxCount,
             bool prefetchJsonData = true,
@@ -90,7 +90,7 @@
         ///     An <see cref="ReadStreamPage"/> represent the result of the operation. If all the messages read
         ///     have expired then the message collection MAY be empty.
         /// </returns>
-        Task<ReadStreamPage> ReadStreamForwards(
+        Task<ReadStreamResult> ReadStreamForwards(
             StreamId streamId,
             int fromVersionInclusive,
             int maxCount,
@@ -121,7 +121,7 @@
         ///     An <see cref="ReadStreamPage"/> represent the result of the operation. If all the messages read
         ///     have expired then the message collection MAY be empty.
         /// </returns>
-        Task<ReadStreamPage> ReadStreamBackwards(
+        Task<ReadStreamResult> ReadStreamBackwards(
             StreamId streamId,
             int fromVersionInclusive,
             int maxCount,

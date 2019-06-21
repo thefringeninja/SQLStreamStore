@@ -2,6 +2,7 @@
 {
     using System;
     using System.Diagnostics;
+    using System.Linq;
     using System.Threading.Tasks;
     using Shouldly;
     using SqlStreamStore.Streams;
@@ -47,7 +48,7 @@
         [Fact]
         public async Task Can_get_stream_message_count_with_created_before_date()
         {
-            using (var fixture = await MsSqlStreamStoreFixture.Create())
+            using(var fixture = await MsSqlStreamStoreFixture.Create())
             {
                 var store = fixture.Store;
                 fixture.GetUtcNow = () => new DateTime(2016, 1, 1, 0, 0, 0);
@@ -84,7 +85,7 @@
         [Fact]
         public async Task Can_drop_all()
         {
-            using (var fixture = await MsSqlStreamStoreFixture.Create())
+            using(var fixture = await MsSqlStreamStoreFixture.Create())
             {
                 await fixture.Store.DropAll();
             }
@@ -93,7 +94,7 @@
         [Fact]
         public async Task Can_check_schema()
         {
-            using (var fixture = await MsSqlStreamStoreFixture.Create())
+            using(var fixture = await MsSqlStreamStoreFixture.Create())
             {
                 var result = await fixture.Store.CheckSchema();
 
@@ -106,7 +107,7 @@
         [Fact]
         public async Task When_schema_is_v1_then_should_not_match()
         {
-            using (var fixture = await MsSqlStreamStoreFixture.CreateWithV1Schema())
+            using(var fixture = await MsSqlStreamStoreFixture.CreateWithV1Schema())
             {
                 var result = await fixture.Store.CheckSchema();
 
@@ -119,7 +120,7 @@
         [Fact]
         public async Task When_schema_is_not_created_then_should_be_indicated()
         {
-            using (var fixture = await MsSqlStreamStoreFixture.Create(createSchema:false))
+            using(var fixture = await MsSqlStreamStoreFixture.Create(createSchema: false))
             {
                 var result = await fixture.Store.CheckSchema();
 
@@ -153,8 +154,9 @@
             TestOutputHelper.WriteLine($"Append: {stopwatch.Elapsed}");
 
             stopwatch.Restart();
-            var readStreamPage = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, 1);
-            var jsonData = await readStreamPage.Messages[0].GetJsonData();
+            var result = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, 1);
+
+            var jsonData = await await result.Select(x => x.GetJsonData()).FirstAsync();
             TestOutputHelper.WriteLine($"Read: {stopwatch.Elapsed}");
         }
 
@@ -169,8 +171,11 @@
             TestOutputHelper.WriteLine($"Append: {stopwatch.Elapsed}");
 
             stopwatch.Restart();
-            var readStreamPage = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, prefetchJsonData:false, maxCount: 1);
-            var jsonData = await readStreamPage.Messages[0].GetJsonData();
+            var result = await fixture.Store.ReadStreamForwards(streamId,
+                StreamVersion.Start,
+                prefetchJsonData: false,
+                maxCount: 1);
+            var jsonData = await await result.Select(x => x.GetJsonData()).FirstAsync();
             TestOutputHelper.WriteLine($"Read: {stopwatch.Elapsed}");
         }
     }

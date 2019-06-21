@@ -30,7 +30,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        public static IAsyncEnumerable<StreamMessage> ReadAllForwards(
+        public static Task<IAsyncEnumerable<StreamMessage>> ReadAllForwards(
             this IReadonlyStreamStore readonlyStreamStore,
             long fromPositionInclusive,
             int maxCount,
@@ -62,7 +62,7 @@
         ///     An <see cref="ReadAllPage"/> presenting the result of the read. If all messages read have expired
         ///     then the message collection MAY be empty.
         /// </returns>
-        public static IAsyncEnumerable<StreamMessage> ReadAllBackwards(
+        public static Task<IAsyncEnumerable<StreamMessage>> ReadAllBackwards(
             this IReadonlyStreamStore readonlyStreamStore,
             long fromPositionInclusive,
             int maxCount,
@@ -97,7 +97,7 @@
         ///     An <see cref="ReadStreamPage"/> represent the result of the operation. If all the messages read
         ///     have expired then the message collection MAY be empty.
         /// </returns>
-        public static Task<ReadStreamPage> ReadStreamForwards(
+        public static Task<ReadStreamResult> ReadStreamForwards(
             this IReadonlyStreamStore readonlyStreamStore,
             string streamId,
             int fromVersionInclusive,
@@ -134,7 +134,7 @@
         ///     An <see cref="ReadStreamPage"/> represent the result of the operation. If all the messages read
         ///     have expired then the message collection MAY be empty.
         /// </returns>
-        public static Task<ReadStreamPage> ReadStreamBackwards(
+        public static Task<ReadStreamResult> ReadStreamBackwards(
             this IReadonlyStreamStore readonlyStreamStore,
             string streamId,
             int fromVersionInclusive,

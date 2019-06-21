@@ -119,7 +119,9 @@
             {
                 bool? lastHasCaughtUp = null;
 
-                await foreach(var message in Pull())
+                var messages = await Pull();
+
+                await foreach(var message in messages)
                 {
                     await Push(message);
                 }
@@ -163,11 +165,11 @@
             // Edge case for empty store where Next position 0 (when FromPosition = 0)
         }
 
-        private IAsyncEnumerable<StreamMessage> Pull()
+        private async Task<IAsyncEnumerable<StreamMessage>> Pull()
         {
             try
             {
-                return _readonlyStreamStore.ReadAllForwards(_nextPosition,
+                return await _readonlyStreamStore.ReadAllForwards(_nextPosition,
                     MaxCountPerRead,
                     _prefetchJsonData,
                     _disposed.Token);

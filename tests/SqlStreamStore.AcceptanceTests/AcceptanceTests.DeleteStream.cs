@@ -32,11 +32,11 @@
             await store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
             await store.DeleteStream(streamId, 2);
 
-            var page =
+            var result =
                 await store.ReadStreamBackwards(DeletedStreamId, StreamVersion.End, 1);
 
-            page.Status.ShouldBe(PageReadStatus.Success);
-            var message = page.Messages.Single();
+            result.Status.ShouldBe(PageReadStatus.Success);
+            var message = await result.SingleAsync();
             message.Type.ShouldBe(StreamDeletedMessageType);
             var streamDeleted = await message.GetJsonDataAs<StreamDeleted>();
             streamDeleted.StreamId.ShouldBe("stream");
@@ -90,7 +90,7 @@
                 await store.ReadStreamBackwards(DeletedStreamId, StreamVersion.End, 1);
 
             page.Status.ShouldBe(PageReadStatus.Success);
-            var message = page.Messages.Single();
+            var message = await page.SingleAsync();
             message.Type.ShouldBe(StreamDeletedMessageType);
             var streamDeleted = await message.GetJsonDataAs<StreamDeleted>();
             streamDeleted.StreamId.ShouldBe("stream");

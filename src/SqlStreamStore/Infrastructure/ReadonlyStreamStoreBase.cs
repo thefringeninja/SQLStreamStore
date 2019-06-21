@@ -44,7 +44,7 @@ namespace SqlStreamStore.Infrastructure
             _disableMetadataCache = true;
         }
 
-        public async IAsyncEnumerable<StreamMessage> ReadAllForwards(
+        public async Task<IAsyncEnumerable<StreamMessage>> ReadAllForwards(
             long fromPositionInclusive,
             int pageSize,
             bool prefetchJsonData,
@@ -72,6 +72,13 @@ namespace SqlStreamStore.Infrastructure
                     cancellationToken)
                 .NotOnCapturedContext();
 
+            return ReadAllForwards(page, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<StreamMessage> ReadAllForwards(
+            ReadAllPage page,
+            CancellationToken cancellationToken)
+        {
             while(page.Messages.Length != 0)
             {
                 var lastMessage = default(StreamMessage);
@@ -96,7 +103,7 @@ namespace SqlStreamStore.Infrastructure
             }
         }
 
-        public async IAsyncEnumerable<StreamMessage> ReadAllBackwards(
+        public async Task<IAsyncEnumerable<StreamMessage>> ReadAllBackwards(
             long fromPositionInclusive,
             int maxCount,
             bool prefetchJsonData,
@@ -113,7 +120,6 @@ namespace SqlStreamStore.Infrastructure
                 fromPositionInclusive,
                 maxCount);
 
-
             Task<ReadAllPage> ReadNext(long nextPosition, CancellationToken ct) => ReadAllBackwardsInternal(
                 nextPosition,
                 maxCount,
@@ -121,12 +127,20 @@ namespace SqlStreamStore.Infrastructure
                 ReadNext,
                 ct);
 
-            var page = await ReadAllBackwardsInternal(fromPositionInclusive,
+            var page = await ReadAllBackwardsInternal(
+                fromPositionInclusive,
                 maxCount,
                 prefetchJsonData,
                 ReadNext,
                 cancellationToken);
 
+            return ReadAllBackwards(page, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<StreamMessage> ReadAllBackwards(
+            ReadAllPage page,
+            CancellationToken cancellationToken)
+        {
             while(page.Messages.Length > 0)
             {
                 await foreach(var message in FilterExpired(page, cancellationToken))
@@ -143,7 +157,7 @@ namespace SqlStreamStore.Infrastructure
             }
         }
 
-        public async Task<ReadStreamPage> ReadStreamForwards(
+        public async Task<ReadStreamResult> ReadStreamForwards(
             StreamId streamId,
             int fromVersionInclusive,
             int maxCount,
@@ -162,18 +176,23 @@ namespace SqlStreamStore.Infrastructure
                 fromVersionInclusive,
                 maxCount);
 
-            ReadNextStreamPage readNext = (nextVersion, ct) =>
-                ReadStreamForwards(streamId, nextVersion, maxCount, prefetchJsonData, ct);
-            var page = await ReadStreamForwardsInternal(streamId,
+            Task<ReadStreamPage> ReadNext(int nextVersion, CancellationToken ct) =>
+                ReadStreamForwardsInternal(streamId, nextVersion, maxCount, prefetchJsonData, ReadNext, ct);
+
+            var page = await ReadStreamForwardsInternal(
+                streamId,
                 fromVersionInclusive,
                 maxCount,
                 prefetchJsonData,
-                readNext,
+                ReadNext,
                 cancellationToken);
-            return await FilterExpired(page, readNext, cancellationToken);
+
+            return page.Status == PageReadStatus.StreamNotFound
+                ? ReadStreamResult.NotFound
+                : new ReadStreamResult(ReadStream(page, cancellationToken), page.LastStreamVersion);
         }
 
-        public async Task<ReadStreamPage> ReadStreamBackwards(
+        public async Task<ReadStreamResult> ReadStreamBackwards(
             StreamId streamId,
             int fromVersionInclusive,
             int maxCount,
@@ -192,15 +211,40 @@ namespace SqlStreamStore.Infrastructure
                 fromVersionInclusive,
                 maxCount);
 
-            ReadNextStreamPage readNext =
-                (nextVersion, ct) => ReadStreamBackwards(streamId, nextVersion, maxCount, prefetchJsonData, ct);
-            var page = await ReadStreamBackwardsInternal(streamId,
+            Task<ReadStreamPage> ReadNext(int nextVersion, CancellationToken ct)
+                => ReadStreamBackwardsInternal(streamId, nextVersion, maxCount, prefetchJsonData, ReadNext, ct);
+
+            var page = await ReadStreamBackwardsInternal(
+                streamId,
                 fromVersionInclusive,
                 maxCount,
                 prefetchJsonData,
-                readNext,
+                ReadNext,
                 cancellationToken);
-            return await FilterExpired(page, readNext, cancellationToken);
+
+            return page.Status == PageReadStatus.StreamNotFound
+                ? ReadStreamResult.NotFound
+                : new ReadStreamResult(ReadStream(page, cancellationToken), page.LastStreamVersion);
+        }
+
+        private async IAsyncEnumerable<StreamMessage> ReadStream(
+            ReadStreamPage page,
+            CancellationToken cancellationToken)
+        {
+            while(page.Messages.Length > 0)
+            {
+                await foreach(var message in FilterExpired(page, cancellationToken))
+                {
+                    yield return message;
+                }
+
+                if(page.IsEnd)
+                {
+                    break;
+                }
+
+                page = await page.ReadNext(cancellationToken).NotOnCapturedContext();
+            }
         }
 
         public IStreamSubscription SubscribeToStream(
@@ -439,6 +483,47 @@ namespace SqlStreamStore.Infrastructure
 
             var currentUtc = GetUtcNow();
             foreach(var streamMessage in readAllPage.Messages)
+            {
+                if(streamMessage.StreamId.StartsWith("$"))
+                {
+                    yield return streamMessage;
+                    continue;
+                }
+
+                int? maxAge = _metadataMaxAgeCache == null
+                    ? null
+                    : await _metadataMaxAgeCache.GetMaxAge(streamMessage.StreamId, cancellationToken);
+                if(!maxAge.HasValue)
+                {
+                    yield return streamMessage;
+                    continue;
+                }
+
+                if(streamMessage.CreatedUtc.AddSeconds(maxAge.Value) > currentUtc)
+                {
+                    yield return streamMessage;
+                }
+                else
+                {
+                    PurgeExpiredMessage(streamMessage);
+                }
+            }
+        }
+
+        private async IAsyncEnumerable<StreamMessage> FilterExpired(
+            ReadStreamPage page,
+            CancellationToken cancellationToken)
+        {
+            if(_disableMetadataCache)
+            {
+                foreach(var message in page.Messages)
+                {
+                    yield return message;
+                }
+            }
+
+            var currentUtc = GetUtcNow();
+            foreach(var streamMessage in page.Messages)
             {
                 if(streamMessage.StreamId.StartsWith("$"))
                 {

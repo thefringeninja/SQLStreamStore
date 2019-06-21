@@ -2,6 +2,7 @@
 {
     using System;
     using System.Diagnostics;
+    using System.Linq;
     using System.Threading.Tasks;
     using Shouldly;
     using SqlStreamStore.Streams;
@@ -111,8 +112,9 @@
             TestOutputHelper.WriteLine($"Append: {stopwatch.Elapsed}");
 
             stopwatch.Restart();
-            var readStreamPage = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, 1);
-            var jsonData = await readStreamPage.Messages[0].GetJsonData();
+            var result = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, 1);
+            var jsonData = await await result.Select(async x => await x.GetJsonData()).FirstAsync();
+
             TestOutputHelper.WriteLine($"Read: {stopwatch.Elapsed}");
         }
 
@@ -127,8 +129,8 @@
             TestOutputHelper.WriteLine($"Append: {stopwatch.Elapsed}");
 
             stopwatch.Restart();
-            var readStreamPage = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, prefetchJsonData: false, maxCount: 1);
-            var jsonData = await readStreamPage.Messages[0].GetJsonData();
+            var result = await fixture.Store.ReadStreamForwards(streamId, StreamVersion.Start, prefetchJsonData: false, maxCount: 1);
+            var jsonData = await await result.Select(async x => await x.GetJsonData()).FirstAsync();
             TestOutputHelper.WriteLine($"Read: {stopwatch.Elapsed}");
         }
     }

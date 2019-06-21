@@ -77,7 +77,7 @@
             int lastStreamVersion,
             long lastStreamPosition,
             ReadDirection direction,
-            bool isEnd, 
+            bool isEnd,
             ReadNextStreamPage readNext = null,
             StreamMessage[] messages = null)
         {

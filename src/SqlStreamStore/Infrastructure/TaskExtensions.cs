@@ -31,6 +31,14 @@
         public static ConfiguredCancelableAsyncEnumerable<T> NotOnCapturedContext<T>(this IAsyncEnumerable<T> enumerable)
         {
             return enumerable.ConfigureAwait(false);
-        } 
+        }
+
+        /// <summary>
+        /// ConfigureAwait(false)
+        /// </summary>
+        public static ConfiguredValueTaskAwaitable<T> NotOnCapturedContext<T>(this ValueTask<T> task)
+        {
+            return task.ConfigureAwait(false);
+        }
     }
 }
