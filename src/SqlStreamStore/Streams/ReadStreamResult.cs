@@ -37,6 +37,9 @@ namespace SqlStreamStore.Streams
         }
 
         public IAsyncEnumerator<StreamMessage> GetAsyncEnumerator(CancellationToken cancellationToken = default)
-            => _inner.GetAsyncEnumerator(cancellationToken);
+            => _inner.TakeWhile(ConsistentWithLastStreamVersion).GetAsyncEnumerator(cancellationToken);
+
+        private bool ConsistentWithLastStreamVersion(StreamMessage message)
+            => message.StreamVersion <= LastStreamVersion;
     }
 }
