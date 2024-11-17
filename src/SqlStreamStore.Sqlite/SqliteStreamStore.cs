@@ -111,7 +111,7 @@ namespace SqlStreamStore
         }
 
 
-        internal void CreateSchemaIfNotExists()
+        public void CreateSchemaIfNotExists()
         {
             using(var connection = OpenConnection(false))
             using(var command = connection.CreateCommand())
