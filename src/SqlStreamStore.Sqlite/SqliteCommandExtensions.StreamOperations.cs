@@ -287,16 +287,16 @@ namespace SqlStreamStore
                         var preloadJson = (!reader.IsDBNull(6) && prefetchJsonData)
                             ? reader.GetTextReader(6).ReadToEnd()
                             : default;
-                        var streamVersion = reader.ReadScalar<int>(1);  
+                        var streamVersion = reader.GetInt32(1);
                         
                         var msg = new StreamMessage(
                             _streamId,
                             reader.ReadScalar<Guid>(0, Guid.Empty),
                             streamVersion,
-                            reader.ReadScalar<long>(2),
-                            reader.ReadScalar<DateTime>(3),
-                            reader.ReadScalar<string>(4),
-                            reader.ReadScalar<string>(5),
+                            reader.GetInt64(2),
+                            reader.GetDateTime(3),
+                            reader.GetString(4),
+                            reader.GetString(5),
                             ct => prefetchJsonData
                                 ? Task.FromResult(preloadJson)
                                 : SqliteCommandExtensions.GetJsonData(_streamId, streamVersion)
