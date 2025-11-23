@@ -1,45 +1,42 @@
-namespace SqlStreamStore.Streams
-{
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Imports.Ensure.That;
+namespace SqlStreamStore.Streams;
 
-    /// <summary>
-    /// Represents the results of listing stream ids.
-    /// </summary>
-    public sealed class ListStreamsPage
-    {
-        /// <summary>
-        /// A list of stream ids that matched a certain <see cref="Pattern" />
-        /// </summary>
-        public string[] StreamIds { get; }
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
-        /// <summary>
-        /// A continuation token used to retrieve the next page of results.
-        /// </summary>
-        public string ContinuationToken { get; }
+/// <summary>
+/// Represents the results of listing stream ids.
+/// </summary>
+public sealed class ListStreamsPage {
+	/// <summary>
+	/// A list of stream ids that matched a certain <see cref="Pattern" />
+	/// </summary>
+	public string[] StreamIds { get; }
 
-        private readonly ListNextStreamsPage _listNextStreamsPage;
+	/// <summary>
+	/// A continuation token used to retrieve the next page of results.
+	/// </summary>
+	public string? ContinuationToken { get; }
 
-        public ListStreamsPage(
-            string continuationToken,
-            string[] streamIds,
-            ListNextStreamsPage listNextStreamsPage)
-        {
-            Ensure.That(streamIds).IsNotNull();
-            Ensure.That(listNextStreamsPage).IsNotNull();
+	private readonly ListNextStreamsPage _listNextStreamsPage;
 
-            StreamIds = streamIds;
-            ContinuationToken = continuationToken;
-            _listNextStreamsPage = listNextStreamsPage;
-        }
+	public ListStreamsPage(
+		string? continuationToken,
+		string[] streamIds,
+		ListNextStreamsPage listNextStreamsPage) {
+		ArgumentNullException.ThrowIfNull(streamIds);
+		ArgumentNullException.ThrowIfNull(listNextStreamsPage);
 
-        /// <summary>
-        /// Call this method to automatically get the next <see cref="ListStreamsPage"/>
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns>A <see cref="ListStreamsPage" /></returns>
-        public Task<ListStreamsPage> Next(CancellationToken cancellationToken = default) 
-            => _listNextStreamsPage(ContinuationToken, cancellationToken);
-    }
+		StreamIds = streamIds;
+		ContinuationToken = continuationToken;
+		_listNextStreamsPage = listNextStreamsPage;
+	}
+
+	/// <summary>
+	/// Call this method to automatically get the next <see cref="ListStreamsPage"/>
+	/// </summary>
+	/// <param name="cancellationToken"></param>
+	/// <returns>A <see cref="ListStreamsPage" /></returns>
+	public Task<ListStreamsPage> Next(CancellationToken cancellationToken = default)
+		=> _listNextStreamsPage(ContinuationToken, cancellationToken);
 }

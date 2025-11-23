@@ -1,327 +1,296 @@
-﻿namespace SqlStreamStore.HAL.Tests
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Net;
-    using System.Net.Http;
-    using System.Net.Http.Headers;
-    using System.Threading.Tasks;
-    using Newtonsoft.Json.Linq;
-    using Shouldly;
-    using SqlStreamStore.Streams;
-    using Xunit;
-    using Xunit.Abstractions;
+﻿namespace SqlStreamStore.HAL.Tests;
 
-    public class StreamAppendTests : IDisposable
-    {
-        private const string StreamId = "a-stream";
-        private readonly SqlStreamStoreHalMiddlewareFixture _fixture;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using Shouldly;
+using SqlStreamStore.Streams;
+using Xunit;
+using Xunit.Abstractions;
 
-        public StreamAppendTests(ITestOutputHelper output)
-        {
-            _fixture = new SqlStreamStoreHalMiddlewareFixture(output);
-        }
+public class StreamAppendTests : IDisposable {
+	private const string StreamId = "a-stream";
+	private readonly SqlStreamStoreHalMiddlewareFixture _fixture;
 
-        public static IEnumerable<object[]> AppendCases()
-        {
-            var messageId1 = Guid.NewGuid();
-            var messageId2 = Guid.NewGuid();
+	public StreamAppendTests(ITestOutputHelper output) {
+		_fixture = new SqlStreamStoreHalMiddlewareFixture(output);
+	}
 
-            var jsonData = JObject.FromObject(new
-            {
-                property = "value"
-            });
+	public static IEnumerable<object?[]> AppendCases() {
+		var messageId1 = Guid.NewGuid();
+		var messageId2 = Guid.NewGuid();
 
-            var jsonMetadata = JObject.FromObject(new
-            {
-                property = "metaValue"
-            });
+		var jsonData = JsonNode.Parse(
+			"""
+			{
+			    "property": "value"
+			}
+			""");
 
-            var bodies = new (JToken, Guid[])[]
-            {
-                (JObject.FromObject(new
-                {
-                    messageId = messageId1,
-                    type = "type",
-                    jsonData,
-                    jsonMetadata
-                }), new[] { messageId1 }),
-                (JArray.FromObject(new[]
-                    {
-                        new
-                        {
-                            messageId = messageId1,
-                            type = "type",
-                            jsonData,
-                            jsonMetadata
-                        },
-                        new
-                        {
-                            messageId = messageId2,
-                            type = "type",
-                            jsonData,
-                            jsonMetadata
-                        }
-                    }),
-                    new[] { messageId1, messageId2 })
-            };
+		var jsonMetadata = JsonNode.Parse(
+			"""
+			{
+			    "property": "metaValue"
+			}
+			""");
 
-            var location = new Uri($"../{Constants.Paths.Streams}/{StreamId}", UriKind.Relative);
+		var multiple = JsonNode.Parse(
+			$$"""
+			  [
+			      {
+			          "messageId": "{{messageId1}}",
+			          "type": "type",
+			          "jsonData": {{jsonData}},
+			          "jsonMetadata": {{jsonMetadata}}
+			      },
+			      {
+			          "messageId": "{{messageId2}}",
+			          "type": "type",
+			          "jsonData": {{jsonData}},
+			          "jsonMetadata": {{jsonMetadata}}
+			      }
+			  ]
+			  """);
+		var single = JsonNode.Parse(
+			$$"""
+			  {
+			     "messageId": "{{messageId1}}",
+			     "type": "type",
+			     "jsonData": {{jsonData}},
+			     "jsonMetadata": {{jsonMetadata}}
+			  }
+			  """);
+		var bodies = new[]
+		{
+			(single, new[] { messageId1 }),
+			(multiple, new[] { messageId1, messageId2 })
+		};
 
-            foreach(var (body, messageIds) in bodies)
-            {
-                yield return new object[]
-                {
-                    ExpectedVersion.Any,
-                    body,
-                    messageIds,
-                    jsonData,
-                    jsonMetadata,
-                    HttpStatusCode.OK,
-                    null
-                };
-                yield return new object[]
-                {
-                    default(int?),
-                    body,
-                    messageIds,
-                    jsonData,
-                    jsonMetadata,
-                    HttpStatusCode.OK,
-                    null
-                };
-                yield return new object[]
-                {
-                    ExpectedVersion.NoStream,
-                    body,
-                    messageIds,
-                    jsonData,
-                    jsonMetadata,
-                    HttpStatusCode.Created,
-                    location
-                };
-            }
-        }
+		var location = new Uri($"../{Constants.Paths.Streams}/{StreamId}", UriKind.Relative);
 
-        [Theory, MemberData(nameof(AppendCases))]
-        public async Task expected_version(
-            int? expectedVersion,
-            JToken body,
-            Guid[] messageIds,
-            JObject jsonData,
-            JObject jsonMetadata,
-            HttpStatusCode statusCode,
-            Uri location)
-        {
-            var request = new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}")
-            {
-                Content = new StringContent(body.ToString())
-            };
+		foreach (var (body, messageIds) in bodies) {
+			yield return new object?[]
+			{
+				ExpectedVersion.Any,
+				body,
+				messageIds,
+				jsonData,
+				jsonMetadata,
+				HttpStatusCode.OK,
+				null
+			};
+			yield return new object?[]
+			{
+				default(int?),
+				body,
+				messageIds,
+				jsonData,
+				jsonMetadata,
+				HttpStatusCode.OK,
+				null
+			};
+			yield return new object?[]
+			{
+				ExpectedVersion.NoStream,
+				body,
+				messageIds,
+				jsonData,
+				jsonMetadata,
+				HttpStatusCode.Created,
+				location
+			};
+		}
+	}
 
-            if(expectedVersion.HasValue)
-            {
-                request.Headers.Add(Constants.Headers.ExpectedVersion, $"{expectedVersion}");
-            }
+	[Theory, MemberData(nameof(AppendCases))]
+	public async Task expected_version(
+		int? expectedVersion,
+		JsonNode body,
+		Guid[] messageIds,
+		JsonObject jsonData,
+		JsonObject jsonMetadata,
+		HttpStatusCode statusCode,
+		Uri location) {
+		var request = new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}") {
+			Content = new StringContent(body.ToString())
+		};
 
-            using(var response = await _fixture.HttpClient.SendAsync(request))
-            {
-                response.StatusCode.ShouldBe(statusCode);
-                response.Headers.Location.ShouldBe(location);
-            }
+		if (expectedVersion.HasValue) {
+			request.Headers.Add(Constants.Headers.ExpectedVersion, $"{expectedVersion}");
+		}
 
-            var page = await _fixture.StreamStore.ReadStreamForwards(StreamId, 0, int.MaxValue);
+		using (var response = await _fixture.HttpClient.SendAsync(request)) {
+			response.StatusCode.ShouldBe(statusCode);
+			response.Headers.Location.ShouldBe(location);
+		}
 
-            page.Status.ShouldBe(PageReadStatus.Success);
-            page.Messages.Length.ShouldBe(messageIds.Length);
-            for(var i = 0; i < messageIds.Length; i++)
-            {
-                page.Messages[i].MessageId.ShouldBe(messageIds[i]);
-                page.Messages[i].Type.ShouldBe("type");
-                JToken.DeepEquals(JObject.Parse(await page.Messages[i].GetJsonData()), jsonData).ShouldBeTrue();
-                JToken.DeepEquals(JObject.Parse(page.Messages[i].JsonMetadata), jsonMetadata).ShouldBeTrue();
-            }
-        }
+		var page = await _fixture.StreamStore.ReadStreamForwards(StreamId, 0, int.MaxValue);
 
-        [Theory]
-        [InlineData(new[] { ExpectedVersion.NoStream, ExpectedVersion.NoStream })]
-        [InlineData(new[] { ExpectedVersion.NoStream, 2 })]
-        public async Task wrong_expected_version(int[] expectedVersions)
-        {
-            var jsonData = JObject.FromObject(new
-            {
-                property = "value"
-            });
+		page.Status.ShouldBe(PageReadStatus.Success);
+		page.Messages.Length.ShouldBe(messageIds.Length);
+		for (var i = 0; i < messageIds.Length; i++) {
+			page.Messages[i].MessageId.ShouldBe(messageIds[i]);
+			page.Messages[i].Type.ShouldBe("type");
+			JsonNode.DeepEquals(JsonNode.Parse(await page.Messages[i].GetJsonData() ?? "{}"), jsonData).ShouldBeTrue();
+			JsonNode.DeepEquals(JsonNode.Parse(page.Messages[i].JsonMetadata ?? "{}"), jsonMetadata).ShouldBeTrue();
+		}
+	}
 
-            var jsonMetadata = JObject.FromObject(new
-            {
-                property = "metaValue"
-            });
+	[Theory]
+	[InlineData(new[] { ExpectedVersion.NoStream, ExpectedVersion.NoStream })]
+	[InlineData(new[] { ExpectedVersion.NoStream, 2 })]
+	public async Task wrong_expected_version(int[] expectedVersions) {
+		var jsonData = JObject.FromObject(new {
+			property = "value"
+		});
 
-            for(var i = 0; i < expectedVersions.Length - 1; i++)
-            {
-                using(await _fixture.HttpClient.SendAsync(
-                    new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}")
-                    {
-                        Headers =
-                        {
-                            { Constants.Headers.ExpectedVersion, $"{expectedVersions[i]}" }
-                        },
-                        Content = new StringContent(JObject.FromObject(new
-                        {
-                            messageId = Guid.NewGuid(),
-                            type = "type",
-                            jsonData,
-                            jsonMetadata
-                        }).ToString())
-                        {
-                            Headers =
-                            {
-                                ContentType = new MediaTypeHeaderValue("application/json")
-                            }
-                        }
-                    }))
-                { }
-            }
+		var jsonMetadata = JObject.FromObject(new {
+			property = "metaValue"
+		});
 
-            using(var response = await _fixture.HttpClient.SendAsync(
-                new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}")
-                {
-                    Headers =
-                    {
-                        { Constants.Headers.ExpectedVersion, $"{expectedVersions[expectedVersions.Length - 1]}" }
-                    },
-                    Content = new StringContent(JObject.FromObject(new
-                    {
-                        messageId = Guid.NewGuid(),
-                        type = "type",
-                        jsonData,
-                        jsonMetadata
-                    }).ToString())
-                    {
-                        Headers =
-                        {
-                            ContentType = new MediaTypeHeaderValue("application/json")
-                        }
-                    }
-                }))
-            {
-                response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-                response.Content.Headers.ContentType.ShouldBe(new MediaTypeHeaderValue(
-                    Constants.MediaTypes.HalJson));
-            }
+		for (var i = 0; i < expectedVersions.Length - 1; i++) {
+			using (await _fixture.HttpClient.SendAsync(
+				       new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}") {
+					       Headers =
+					       {
+						       { Constants.Headers.ExpectedVersion, $"{expectedVersions[i]}" }
+					       },
+					       Content = new StringContent(JObject.FromObject(new {
+						       messageId = Guid.NewGuid(),
+						       type = "type",
+						       jsonData,
+						       jsonMetadata
+					       }).ToString()) {
+						       Headers =
+						       {
+							       ContentType = new MediaTypeHeaderValue("application/json")
+						       }
+					       }
+				       })) { }
+		}
 
-            var page = await _fixture.StreamStore.ReadStreamForwards(StreamId, 0, int.MaxValue);
+		using (var response = await _fixture.HttpClient.SendAsync(
+			       new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}") {
+				       Headers =
+				       {
+					       { Constants.Headers.ExpectedVersion, $"{expectedVersions[expectedVersions.Length - 1]}" }
+				       },
+				       Content = new StringContent(JObject.FromObject(new {
+					       messageId = Guid.NewGuid(),
+					       type = "type",
+					       jsonData,
+					       jsonMetadata
+				       }).ToString()) {
+					       Headers =
+					       {
+						       ContentType = new MediaTypeHeaderValue("application/json")
+					       }
+				       }
+			       })) {
+			response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+			response.Content.Headers.ContentType.ShouldBe(new MediaTypeHeaderValue(
+				Constants.MediaTypes.HalJson));
+		}
 
-            page.Status.ShouldBe(PageReadStatus.Success);
-            page.Messages.Length.ShouldBe(expectedVersions.Length - 1);
-        }
+		var page = await _fixture.StreamStore.ReadStreamForwards(StreamId, 0, int.MaxValue);
 
-        private static IEnumerable<string> MalformedRequests()
-        {
-            var messageId = Guid.NewGuid();
+		page.Status.ShouldBe(PageReadStatus.Success);
+		page.Messages.Length.ShouldBe(expectedVersions.Length - 1);
+	}
 
-            const string type = "type";
+	private static IEnumerable<string> MalformedRequests() {
+		var messageId = Guid.NewGuid();
 
-            var jsonData = JObject.FromObject(new
-            {
-                property = "value"
-            });
+		const string type = "type";
 
-            var jsonMetadata = JObject.FromObject(new
-            {
-                property = "metaValue"
-            });
+		var jsonData = JObject.FromObject(new {
+			property = "value"
+		});
 
-            yield return string.Empty;
-            yield return "{}";
+		var jsonMetadata = JObject.FromObject(new {
+			property = "metaValue"
+		});
 
-            yield return JObject.FromObject(new
-            {
-                messageId = Guid.Empty,
-                type,
-                jsonData,
-                jsonMetadata
-            }).ToString();
+		yield return string.Empty;
+		yield return "{}";
 
-            yield return JObject.FromObject(new
-            {
-                type,
-                jsonData,
-                jsonMetadata
-            }).ToString();
+		yield return JObject.FromObject(new {
+			messageId = Guid.Empty,
+			type,
+			jsonData,
+			jsonMetadata
+		}).ToString();
 
-            yield return JObject.FromObject(new
-            {
-                messageId,
-                jsonData,
-                jsonMetadata
-            }).ToString();
+		yield return JObject.FromObject(new {
+			type,
+			jsonData,
+			jsonMetadata
+		}).ToString();
 
-            yield return $@"{{ ""messageId"": ""{messageId}"", ""type"": ""{type}"", ""jsonData"": {{ }}";
-            yield return $@"{{ ""messageId"": ""{messageId}"", ""type"": ""{type}"", ""jsonMetadata"": {{ }}";
-        }
+		yield return JObject.FromObject(new {
+			messageId,
+			jsonData,
+			jsonMetadata
+		}).ToString();
 
-        public static IEnumerable<object[]> MalformedRequestCases()
-            => MalformedRequests().Select(s => new object[] { s });
+		yield return $@"{{ ""messageId"": ""{messageId}"", ""type"": ""{type}"", ""jsonData"": {{ }}";
+		yield return $@"{{ ""messageId"": ""{messageId}"", ""type"": ""{type}"", ""jsonMetadata"": {{ }}";
+	}
 
-        [Theory, MemberData(nameof(MalformedRequestCases))]
-        public async Task malformed_request_body(string malformedRequest)
-        {
-            using(var response = await _fixture.HttpClient.SendAsync(
-                new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}")
-                {
-                    Content = new StringContent(malformedRequest)
-                    {
-                        Headers = { ContentType = new MediaTypeHeaderValue(Constants.MediaTypes.HalJson) }
-                    }
-                }))
-            {
-                response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-            }
-        }
+	public static IEnumerable<object[]> MalformedRequestCases()
+		=> MalformedRequests().Select(s => new object[] { s });
 
-        public static IEnumerable<object[]> BadExpectedVersionCases()
-        {
-            var random = new Random();
+	[Theory, MemberData(nameof(MalformedRequestCases))]
+	public async Task malformed_request_body(string malformedRequest) {
+		using (var response = await _fixture.HttpClient.SendAsync(
+			       new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}") {
+				       Content = new StringContent(malformedRequest) {
+					       Headers = { ContentType = new MediaTypeHeaderValue(Constants.MediaTypes.HalJson) }
+				       }
+			       })) {
+			response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+		}
+	}
 
-            var maximumBadExpectedVersion = Constants.Headers.MinimumExpectedVersion - 1;
+	public static IEnumerable<object[]> BadExpectedVersionCases() {
+		var random = new Random();
 
-            yield return new object[] { maximumBadExpectedVersion };
-            for(var i = 0; i < 5; i++)
-            {
-                yield return new object[] { random.Next(int.MinValue, maximumBadExpectedVersion) };
-            }
-        }
+		var maximumBadExpectedVersion = Constants.Headers.MinimumExpectedVersion - 1;
 
-        [Theory, MemberData(nameof(BadExpectedVersionCases))]
-        public async Task bad_expected_version(int badExpectedVersion)
-        {
-            using(var response = await _fixture.HttpClient.SendAsync(
-                new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}")
-                {
-                    Headers =
-                    {
-                        {Constants.Headers.ExpectedVersion, $"{badExpectedVersion}"}
-                    },
-                    Content = new StringContent(JObject.FromObject(new
-                    {
-                        messageId = Guid.NewGuid(),
-                        jsonData = new { },
-                        type = "type"
-                    }).ToString())
-                    {
-                        Headers =
-                        {
-                            ContentType = new MediaTypeHeaderValue(Constants.MediaTypes.HalJson)
-                        }
-                    }
-                }))
-            {
-                response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-            }
-        }
+		yield return new object[] { maximumBadExpectedVersion };
+		for (var i = 0; i < 5; i++) {
+			yield return new object[] { random.Next(int.MinValue, maximumBadExpectedVersion) };
+		}
+	}
 
-        public void Dispose() => _fixture.Dispose();
-    }
+	[Theory, MemberData(nameof(BadExpectedVersionCases))]
+	public async Task bad_expected_version(int badExpectedVersion) {
+		using (var response = await _fixture.HttpClient.SendAsync(
+			       new HttpRequestMessage(HttpMethod.Post, $"/{Constants.Paths.Streams}/{StreamId}") {
+				       Headers =
+				       {
+					       {Constants.Headers.ExpectedVersion, $"{badExpectedVersion}"}
+				       },
+				       Content = new StringContent(JObject.FromObject(new {
+					       messageId = Guid.NewGuid(),
+					       jsonData = new { },
+					       type = "type"
+				       }).ToString()) {
+					       Headers =
+					       {
+						       ContentType = new MediaTypeHeaderValue(Constants.MediaTypes.HalJson)
+					       }
+				       }
+			       })) {
+			response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+		}
+	}
+
+	public void Dispose() => _fixture.Dispose();
 }

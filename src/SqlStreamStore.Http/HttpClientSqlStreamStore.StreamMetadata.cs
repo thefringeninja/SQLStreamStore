@@ -1,112 +1,100 @@
-namespace SqlStreamStore
-{
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Net;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Newtonsoft.Json.Linq;
-    using SqlStreamStore.Imports.Ensure.That;
-    using SqlStreamStore.Internal.HoneyBearHalClient;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    partial class HttpClientSqlStreamStore
-    {
-        public async Task<StreamMetadataResult> GetStreamMetadata(
-            string streamId,
-            CancellationToken cancellationToken = default)
-        {
-            Ensure.That(streamId, nameof(streamId)).IsNotNullOrWhiteSpace();
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+using SqlStreamStore.Streams;
 
-            GuardAgainstDisposed();
+partial class HttpClientSqlStreamStore {
+	public async Task<StreamMetadataResult> GetStreamMetadata(
+		string streamId,
+		CancellationToken cancellationToken = default) {
+		ArgumentException.ThrowIfNullOrWhiteSpace(streamId);
 
-            var client = CreateClient(new Resource
-            {
-                Links =
-                {
-                    new Link
-                    {
-                        Href = LinkFormatter.Stream(streamId)
-                    }
-                }
-            });
+		GuardAgainstDisposed();
 
-            client = await client.GetAsync(client.Current.First(), null);
+		var client = CreateClient(new Resource {
+			Links =
+			{
+				new Link
+				{
+					Href = LinkFormatter.Stream(streamId)
+				}
+			}
+		});
 
-            if(client.StatusCode != HttpStatusCode.NotFound)
-            {
-                ThrowOnError(client);
-            }
+		client = await client.GetAsync(client.Current.First(), null!);
 
-            client = await client.GetAsync(client.Current.First(), Constants.Relations.Metadata);
+		if (client.StatusCode != HttpStatusCode.NotFound) {
+			ThrowOnError(client);
+		}
 
-            var resource = client.Current.First();
+		client = await client.GetAsync(client.Current.First(), Constants.Relations.Metadata);
 
-            return resource.Data<HalStreamMetadataResult>();
-        }
+		var resource = client.Current.First();
 
-        public async Task SetStreamMetadata(
-            StreamId streamId,
-            int expectedStreamMetadataVersion = ExpectedVersion.Any,
-            int? maxAge = null,
-            int? maxCount = null,
-            string metadataJson = null,
-            CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+		return resource.Data<HalStreamMetadataResult>();
+	}
 
-            var client = CreateClient(new Resource
-            {
-                Links =
-                {
-                    new Link
-                    {
-                        Href = LinkFormatter.Stream(streamId)
-                    }
-                }
-            });
+	public async Task SetStreamMetadata(
+		StreamId streamId,
+		int expectedStreamMetadataVersion = ExpectedVersion.Any,
+		int? maxAge = null,
+		int? maxCount = null,
+		string? metadataJson = null,
+		CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-            client = await client.GetAsync(client.Current.First(), null);
+		var client = CreateClient(new Resource {
+			Links =
+			{
+				new Link
+				{
+					Href = LinkFormatter.Stream(streamId)
+				}
+			}
+		});
 
-            if(client.StatusCode != HttpStatusCode.NotFound)
-            {
-                ThrowOnError(client);
-            }
+		client = await client.GetAsync(client.Current.First(), null!);
 
-            client = await client.GetAsync(client.Current.First(), Constants.Relations.Metadata);
+		if (client.StatusCode != HttpStatusCode.NotFound) {
+			ThrowOnError(client);
+		}
 
-            if(client.StatusCode != HttpStatusCode.NotFound)
-            {
-                ThrowOnError(client);
-            }
+		client = await client.GetAsync(client.Current.First(), Constants.Relations.Metadata);
 
-            var metadata = new Dictionary<string, object>
-            {
-                ["maxAge"] = maxAge,
-                ["maxCount"] = maxCount
-            };
+		if (client.StatusCode != HttpStatusCode.NotFound) {
+			ThrowOnError(client);
+		}
 
-            if(!string.IsNullOrEmpty(metadataJson))
-            {
-                metadata["metadataJson"] = TryParseMetadataJson(metadataJson);
-            }
+		var metadata = new Dictionary<string, object?> {
+			["maxAge"] = maxAge,
+			["maxCount"] = maxCount
+		};
 
-            client = await client.Post(
-                Constants.Relations.Self,
-                metadata,
-                null,
-                null,
-                new Dictionary<string, string[]>
-                {
-                    [Constants.Headers.ExpectedVersion] = new[] { $"{expectedStreamMetadataVersion}" }
-                },
-                cancellationToken);
+		if (!string.IsNullOrEmpty(metadataJson)) {
+			metadata["metadataJson"] = TryParseMetadataJson(metadataJson);
+		}
 
-            ThrowOnError(client);
-        }
+		client = await client.Post(
+			Constants.Relations.Self,
+			metadata,
+			null,
+			null,
+			new Dictionary<string, string[]> {
+				[Constants.Headers.ExpectedVersion] = [$"{expectedStreamMetadataVersion}"]
+			},
+			cancellationToken);
 
-        private static object TryParseMetadataJson(string metadataJson)
-            => metadataJson == default ? default : JObject.Parse(metadataJson);
-    }
+		ThrowOnError(client);
+	}
+
+	private static object? TryParseMetadataJson(string? metadataJson)
+		=> metadataJson == null ? null : JsonNode.Parse(metadataJson);
 }

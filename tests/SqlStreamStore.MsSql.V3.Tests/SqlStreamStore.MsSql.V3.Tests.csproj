@@ -1,19 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <AssemblyName>SqlStreamStore.MsSql.V3.Tests</AssemblyName>
-    <RootNamespace>SqlStreamStore</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\SqlStreamStore.AcceptanceTests\*.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\SqlStreamStore.MsSql.Tests\MsSqlStreamStoreFixture.cs" Link="MsSqlStreamStoreFixture.cs" />
-    <Compile Include="..\SqlStreamStore.MsSql.Tests\MsSqlStreamStoreFixturePool.cs" Link="MsSqlStreamStoreFixturePool.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\SqlStreamStore.MsSql\SqlStreamStore.MsSql.csproj" />
-    <ProjectReference Include="..\..\src\SqlStreamStore.TestUtils\SqlStreamStore.TestUtils.csproj" />
-  </ItemGroup>
-
+    <PropertyGroup>
+        <AssemblyName>SqlStreamStore.MsSql.V3.Tests</AssemblyName>
+        <RootNamespace>SqlStreamStore</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="..\SqlStreamStore.AcceptanceTests\*.cs"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Include="..\SqlStreamStore.MsSql.Tests\MsSqlStreamStoreFixture.cs" Link="MsSqlStreamStoreFixture.cs"/>
+        <Compile Include="..\SqlStreamStore.MsSql.Tests\MsSqlStreamStoreFixturePool.cs" Link="MsSqlStreamStoreFixturePool.cs"/>
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\SqlStreamStore.MsSql\SqlStreamStore.MsSql.csproj"/>
+        <ProjectReference Include="..\SqlStreamStore.TestUtils\SqlStreamStore.TestUtils.csproj"/>
+    </ItemGroup>
 </Project>

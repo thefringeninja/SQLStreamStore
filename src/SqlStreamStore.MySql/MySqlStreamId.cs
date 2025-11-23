@@ -1,50 +1,42 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Security.Cryptography;
-    using System.Text;
+﻿namespace SqlStreamStore;
 
-    internal struct MySqlStreamId : IEquatable<MySqlStreamId>
-    {
-        public readonly string Id;
-        public readonly string IdOriginal;
+using System;
+using System.Security.Cryptography;
+using System.Text;
 
-        public MySqlStreamId(string idOriginal)
-        {
-            Id = Guid.TryParse(idOriginal, out _)
-                ? idOriginal
-                : ComputeHash(idOriginal);
-            IdOriginal = idOriginal;
-        }
+internal struct MySqlStreamId : IEquatable<MySqlStreamId> {
+	public readonly string Id;
+	public readonly string IdOriginal;
 
-        private static string ComputeHash(string idOriginal)
-        {
-            using(var sha1 = SHA1.Create())
-            {
-                var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(idOriginal));
-                return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
-            }
-        }
+	public MySqlStreamId(string idOriginal) {
+		Id = Guid.TryParse(idOriginal, out _)
+			? idOriginal
+			: ComputeHash(idOriginal);
+		IdOriginal = idOriginal;
+	}
 
-        public static readonly MySqlStreamId Deleted
-            = new MySqlStreamId(Streams.Deleted.DeletedStreamId);
+	private static string ComputeHash(string idOriginal) {
+		using (var sha1 = SHA1.Create()) {
+			var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(idOriginal));
+			return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+		}
+	}
 
-        public static bool operator ==(MySqlStreamId left, MySqlStreamId right) => left.Equals(right);
-        public static bool operator !=(MySqlStreamId left, MySqlStreamId right) => !left.Equals(right);
+	public static readonly MySqlStreamId Deleted = new(Streams.Deleted.DeletedStreamId);
 
-        public bool Equals(MySqlStreamId other)
-            => string.Equals(Id, other.Id) && string.Equals(IdOriginal, other.IdOriginal);
+	public static bool operator ==(MySqlStreamId left, MySqlStreamId right) => left.Equals(right);
+	public static bool operator !=(MySqlStreamId left, MySqlStreamId right) => !left.Equals(right);
 
-        public override bool Equals(object obj) => obj is MySqlStreamId other && Equals(other);
+	public bool Equals(MySqlStreamId other)
+		=> string.Equals(Id, other.Id) && string.Equals(IdOriginal, other.IdOriginal);
 
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (Id.GetHashCode() * 397) ^ IdOriginal.GetHashCode();
-            }
-        }
+	public override bool Equals(object? obj) => obj is MySqlStreamId other && Equals(other);
 
-        public override string ToString() => IdOriginal;
-    }
+	public override int GetHashCode() {
+		unchecked {
+			return (Id.GetHashCode() * 397) ^ IdOriginal.GetHashCode();
+		}
+	}
+
+	public override string ToString() => IdOriginal;
 }

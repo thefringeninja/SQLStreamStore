@@ -1,15 +1,13 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System;
+﻿namespace SqlStreamStore.HAL;
 
-    internal struct Unit : IEquatable<Unit>
-    {
-        public static readonly Unit Instance = new Unit();
+using System;
 
-        public bool Equals(Unit other) => true;
-        public override bool Equals(object obj) => obj is Unit;
-        public override int GetHashCode() => 0;
-        public static bool operator ==(Unit left, Unit right) => true;
-        public static bool operator !=(Unit left, Unit right) => true;
-    }
+internal struct Unit : IEquatable<Unit> {
+	public static readonly Unit Instance = new();
+
+	public bool Equals(Unit other) => true;
+	public override bool Equals(object? obj) => obj is Unit;
+	public override int GetHashCode() => 0;
+	public static bool operator ==(Unit left, Unit right) => true;
+	public static bool operator !=(Unit left, Unit right) => true;
 }

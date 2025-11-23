@@ -1,55 +1,50 @@
-namespace SqlStreamStore
-{
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Imports.Ensure.That;
-    using SqlStreamStore.Internal.HoneyBearHalClient;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    partial class HttpClientSqlStreamStore
-    {
-        public async Task<AppendResult> AppendToStream(
-            StreamId streamId,
-            int expectedVersion,
-            NewStreamMessage[] messages,
-            CancellationToken cancellationToken = default)
-        {
-            Ensure.That(expectedVersion, nameof(expectedVersion)).IsGte(ExpectedVersion.NoStream);
-            Ensure.That(messages, nameof(messages)).IsNotNull();
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+using SqlStreamStore.Streams;
 
-            GuardAgainstDisposed();
+partial class HttpClientSqlStreamStore {
+	public async Task<AppendResult> AppendToStream(
+		StreamId streamId,
+		int expectedVersion,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken = default) {
+		ArgumentNullException.ThrowIfNull(messages);
+		ArgumentOutOfRangeException.ThrowIfLessThan(expectedVersion, ExpectedVersion.NoStream);
 
-            var client = CreateClient(new Resource
-            {
-                Links =
-                {
-                    new Link
-                    {
-                        Href = LinkFormatter.Stream(streamId),
-                        Rel = Constants.Relations.AppendToStream
-                    }
-                }
-            });
+		GuardAgainstDisposed();
 
-            client = await client.Post(
-                Constants.Relations.AppendToStream,
-                messages,
-                null,
-                null,
-                new Dictionary<string, string[]>
-                {
-                    [Constants.Headers.ExpectedVersion] = new[] { $"{expectedVersion}" }
-                },
-                cancellationToken);
+		var client = CreateClient(new Resource {
+			Links =
+			{
+				new Link
+				{
+					Href = LinkFormatter.Stream(streamId),
+					Rel = Constants.Relations.AppendToStream
+				}
+			}
+		});
 
-            ThrowOnError(client);
+		client = await client.Post(
+			Constants.Relations.AppendToStream,
+			messages,
+			null,
+			null,
+			new Dictionary<string, string[]> {
+				[Constants.Headers.ExpectedVersion] = new[] { $"{expectedVersion}" }
+			},
+			cancellationToken);
 
-            var resource = client.Current.First();
+		ThrowOnError(client);
 
-            return resource.Data<HalAppendResult>();
-        }
-    }
+		var resource = client.Current.First();
+
+		return resource.Data<HalAppendResult>();
+	}
 }

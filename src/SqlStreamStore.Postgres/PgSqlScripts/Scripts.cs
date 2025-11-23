@@ -1,99 +1,91 @@
-﻿namespace SqlStreamStore.PgSqlScripts
-{
-    using System;
-    using System.Collections.Concurrent;
-    using System.IO;
-    using System.Reflection;
+﻿namespace SqlStreamStore.PgSqlScripts;
 
-    internal class Scripts
-    {
-        private static readonly Assembly s_assembly = typeof(Scripts)
-            .GetTypeInfo()
-            .Assembly;
+using System;
+using System.Collections.Concurrent;
+using System.IO;
+using System.Reflection;
 
-        private readonly string _schema;
+internal class Scripts {
+	private static readonly Assembly s_assembly = typeof(Scripts)
+		.GetTypeInfo()
+		.Assembly;
 
-        private readonly ConcurrentDictionary<string, string> _scripts
-            = new ConcurrentDictionary<string, string>();
+	private readonly string _schema;
 
-        public Scripts(string schema)
-        {
-            _schema = schema;
-        }
+	private readonly ConcurrentDictionary<string, string> _scripts = new();
 
-        public string DropAll => GetScript(nameof(DropAll));
+	public Scripts(string schema) {
+		_schema = schema;
+	}
 
-        public string EnableExplainAnalyze => GetScript(nameof(EnableExplainAnalyze));
+	public string DropAll => GetScript(nameof(DropAll));
 
-        private string Tables => GetScript(nameof(Tables));
+	public string EnableExplainAnalyze => GetScript(nameof(EnableExplainAnalyze));
 
-        private string AppendToStream => GetScript(nameof(AppendToStream));
-        private string DeleteStream => GetScript(nameof(DeleteStream));
+	private string Tables => GetScript(nameof(Tables));
 
-        private string DeleteStreamMessages => GetScript(nameof(DeleteStreamMessages));
-        private string EnforceIdempotentAppend => GetScript(nameof(EnforceIdempotentAppend));
-        private string ListStreams => GetScript(nameof(ListStreams));
-        private string ListStreamsStartingWith => GetScript(nameof(ListStreamsStartingWith));
-        private string ListStreamsEndingWith => GetScript(nameof(ListStreamsEndingWith));
-        private string ReadAll => GetScript(nameof(ReadAll));
+	private string AppendToStream => GetScript(nameof(AppendToStream));
+	private string DeleteStream => GetScript(nameof(DeleteStream));
 
-        private string Read => GetScript(nameof(Read));
+	private string DeleteStreamMessages => GetScript(nameof(DeleteStreamMessages));
+	private string EnforceIdempotentAppend => GetScript(nameof(EnforceIdempotentAppend));
+	private string ListStreams => GetScript(nameof(ListStreams));
+	private string ListStreamsStartingWith => GetScript(nameof(ListStreamsStartingWith));
+	private string ListStreamsEndingWith => GetScript(nameof(ListStreamsEndingWith));
+	private string ReadAll => GetScript(nameof(ReadAll));
 
-        private string ReadJsonData => GetScript(nameof(ReadJsonData));
+	private string Read => GetScript(nameof(Read));
 
-        private string ReadHeadPosition => GetScript(nameof(ReadHeadPosition));
+	private string ReadJsonData => GetScript(nameof(ReadJsonData));
 
-        private string ReadStreamHeadPosition => GetScript(nameof(ReadStreamHeadPosition));
+	private string ReadHeadPosition => GetScript(nameof(ReadHeadPosition));
 
-        private string ReadStreamHeadVersion => GetScript(nameof(ReadStreamHeadVersion));
+	private string ReadStreamHeadPosition => GetScript(nameof(ReadStreamHeadPosition));
 
-        private string ReadSchemaVersion => GetScript(nameof(ReadSchemaVersion));
+	private string ReadStreamHeadVersion => GetScript(nameof(ReadStreamHeadVersion));
 
-        private string ReadStreamVersionOfMessageId => GetScript(nameof(ReadStreamVersionOfMessageId));
+	private string ReadSchemaVersion => GetScript(nameof(ReadSchemaVersion));
 
-        private string Scavenge => GetScript(nameof(Scavenge));
+	private string ReadStreamVersionOfMessageId => GetScript(nameof(ReadStreamVersionOfMessageId));
 
-        private string SetStreamMetadata => GetScript(nameof(SetStreamMetadata));
+	private string Scavenge => GetScript(nameof(Scavenge));
+
+	private string SetStreamMetadata => GetScript(nameof(SetStreamMetadata));
 
 
-        public string CreateSchema => string.Join(
-            Environment.NewLine,
-            Tables,
-            AppendToStream,
-            DeleteStream,
-            DeleteStreamMessages,
-            EnforceIdempotentAppend,
-            ListStreams,
-            ListStreamsStartingWith,
-            ListStreamsEndingWith,
-            Read,
-            ReadAll,
-            ReadJsonData,
-            ReadHeadPosition,
-            ReadStreamHeadPosition,
-            ReadStreamHeadVersion,
-            ReadSchemaVersion,
-            ReadStreamVersionOfMessageId,
-            Scavenge,
-            SetStreamMetadata);
+	public string CreateSchema => string.Join(
+		Environment.NewLine,
+		Tables,
+		AppendToStream,
+		DeleteStream,
+		DeleteStreamMessages,
+		EnforceIdempotentAppend,
+		ListStreams,
+		ListStreamsStartingWith,
+		ListStreamsEndingWith,
+		Read,
+		ReadAll,
+		ReadJsonData,
+		ReadHeadPosition,
+		ReadStreamHeadPosition,
+		ReadStreamHeadVersion,
+		ReadSchemaVersion,
+		ReadStreamVersionOfMessageId,
+		Scavenge,
+		SetStreamMetadata);
 
-        private string GetScript(string name) => _scripts.GetOrAdd(name,
-            key =>
-            {
-                using(var stream = s_assembly.GetManifestResourceStream(typeof(Scripts), $"{key}.sql"))
-                {
-                    if(stream == null)
-                    {
-                        throw new Exception($"Embedded resource, {name}, not found. BUG!");
-                    }
+	private string GetScript(string name) => _scripts.GetOrAdd(name,
+		key => {
+			using (var stream = s_assembly.GetManifestResourceStream(typeof(Scripts), $"{key}.sql")) {
+				if (stream == null) {
+					throw new Exception($"Embedded resource, {name}, not found. BUG!");
+				}
 
-                    using(StreamReader reader = new StreamReader(stream))
-                    {
-                        return reader
-                            .ReadToEnd()
-                            .Replace("__schema__", _schema);
-                    }
-                }
-            });
-    }
+				using (StreamReader reader = new StreamReader(stream)) {
+					return reader
+						.ReadToEnd()
+						.Replace("__schema__", _schema);
+				}
+			}
+		});
 }

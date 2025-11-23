@@ -1,18 +1,15 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
+﻿namespace SqlStreamStore.HAL;
 
-    internal class NoContentResponse : Response
-    {
-        public static readonly NoContentResponse Instance = new NoContentResponse();
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 
-        private NoContentResponse()
-            : base(204)
-        { }
+internal class NoContentResponse : Response {
+	public static readonly NoContentResponse Instance = new();
 
-        public override Task WriteBody(HttpResponse response, CancellationToken cancellationToken)
-            => Task.CompletedTask;
-    }
+	private NoContentResponse()
+		: base(204) { }
+
+	public override Task WriteBody(HttpResponse response, CancellationToken cancellationToken)
+		=> Task.CompletedTask;
 }

@@ -1,70 +1,61 @@
-namespace SqlStreamStore
-{
-    using System.Threading.Tasks;
-    using SqlStreamStore.Infrastructure;
+namespace SqlStreamStore;
 
-    public class SqliteStreamStoreFixture : IStreamStoreFixture
-    {
-        private bool _preparedPreviously = false;
-        private readonly SqliteStreamStoreSettings _settings;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.Infrastructure;
 
-        public SqliteStreamStoreFixture()
-        {
-            var connectionString = $"Data Source={System.IO.Path.GetTempFileName()};Cache=Shared;";
+public class SqliteStreamStoreFixture : IStreamStoreFixture {
+	private bool _preparedPreviously = false;
+	private readonly SqliteStreamStoreSettings _settings;
 
-            _settings = new SqliteStreamStoreSettings(connectionString)
-            {
-                GetUtcNow = () => GetUtcNow(),
-            };
-        }
+	public SqliteStreamStoreFixture(ILoggerFactory loggerFactory) {
+		var connectionString = $"Data Source={System.IO.Path.GetTempFileName()};Cache=Shared;";
 
-        public void Dispose()
-        {
-            if(Store != null)
-            {
-                Store.Dispose();
-                SqliteStreamStore = null;
-            }
-        }
+		_settings = new SqliteStreamStoreSettings(connectionString, loggerFactory) {
+			GetUtcNow = () => GetUtcNow(),
+		};
+	}
 
-        public IStreamStore Store => SqliteStreamStore;
+	public void Dispose() {
+		if (Store != null) {
+			Store.Dispose();
+			SqliteStreamStore = null!;
+		}
+	}
 
-        public SqliteStreamStore SqliteStreamStore { get; private set; }
+	public IStreamStore Store => SqliteStreamStore;
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public SqliteStreamStore SqliteStreamStore { get; private set; } = null!;
 
-        public long MinPosition { get; set; } = 0;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public int MaxSubscriptionCount { get; set; } = 100;
+	public long MinPosition { get; set; } = 0;
 
-        public bool DisableDeletionTracking
-        {
-            get => _settings.DisableDeletionTracking;
-            set => _settings.DisableDeletionTracking = value;
-        }
+	public int MaxSubscriptionCount { get; set; } = 100;
 
-        public Task Prepare()
-        {
-            _settings.DisableDeletionTracking = false;
-            SqliteStreamStore = new SqliteStreamStore(_settings);
+	public bool DisableDeletionTracking {
+		get => _settings.DisableDeletionTracking;
+		set => _settings.DisableDeletionTracking = value;
+	}
 
-            SqliteStreamStore.CreateSchemaIfNotExists();
-            if (_preparedPreviously)
-            {
-                using(var connection = SqliteStreamStore.OpenConnection(false))
-                using(var command = connection.CreateCommand())
-                {
-                    command.CommandText = @"DELETE FROM messages;
+	public Task Prepare() {
+		_settings.DisableDeletionTracking = false;
+		SqliteStreamStore = new SqliteStreamStore(_settings);
+
+		SqliteStreamStore.CreateSchemaIfNotExists();
+		if (_preparedPreviously) {
+			using (var connection = SqliteStreamStore.OpenConnection(false))
+			using (var command = connection.CreateCommand()) {
+				command.CommandText = @"DELETE FROM messages;
                                             DELETE FROM streams;
                                             UPDATE sqlite_sequence SET seq = 0 WHERE name = 'messages';
                                             UPDATE sqlite_sequence SET seq = 0 WHERE name = 'streams';";
-                    command.ExecuteNonQuery();
-                }
-            }
+				command.ExecuteNonQuery();
+			}
+		}
 
-            _preparedPreviously = true;
+		_preparedPreviously = true;
 
-            return Task.CompletedTask;
-        }
-    }
+		return Task.CompletedTask;
+	}
 }

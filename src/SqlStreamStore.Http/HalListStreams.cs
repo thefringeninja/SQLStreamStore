@@ -1,7 +1,5 @@
-namespace SqlStreamStore
-{
-    internal class HalListStreams
-    {
-        public string ContinuationToken { get; set; }
-    }
+namespace SqlStreamStore;
+
+internal class HalListStreams {
+	public string? ContinuationToken { get; set; }
 }

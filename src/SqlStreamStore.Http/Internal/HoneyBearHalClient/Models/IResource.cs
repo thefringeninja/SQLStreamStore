@@ -1,16 +1,14 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Models
-{
-    using System;
-    using System.Collections.Generic;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-    internal interface IResource : INode, IEnumerable<KeyValuePair<string, object>>
-    {
-        IList<ILink> Links { get; }
+using System;
+using System.Collections.Generic;
 
-        IList<IResource> Embedded { get; }
+internal interface IResource : INode, IEnumerable<KeyValuePair<string, object?>> {
+	IList<ILink> Links { get; }
 
-        Uri BaseAddress { get; }
+	IList<IResource> Embedded { get; }
 
-        IResource WithBaseAddress(Uri baseAddress);
-    }
+	Uri BaseAddress { get; }
+
+	IResource WithBaseAddress(Uri baseAddress);
 }

@@ -1,79 +1,72 @@
-namespace SqlStreamStore
-{
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.Streams;
-    using StreamStoreStore.Json;
+namespace SqlStreamStore;
 
-    public partial class SqliteStreamStore
-    {
-        protected override async Task<StreamMetadataResult> GetStreamMetadataInternal(string streamId, CancellationToken cancellationToken)
-        {
-            GuardAgainstDisposed();
-            cancellationToken.ThrowIfCancellationRequested();
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.Streams;
 
-            var idInfo = new StreamIdInfo(streamId);
+public partial class SqliteStreamStore {
+	protected override async Task<StreamMetadataResult> GetStreamMetadataInternal(string streamId, CancellationToken cancellationToken) {
+		GuardAgainstDisposed();
+		cancellationToken.ThrowIfCancellationRequested();
 
-            var page = await ReadStreamBackwardsInternal(
-                idInfo.MetadataSqlStreamId.IdOriginal,
-                StreamVersion.End,
-                1,
-                true,
-                null,
-                cancellationToken
-            ).ConfigureAwait(false);
+		var idInfo = new StreamIdInfo(streamId);
 
-            if(page.Status == PageReadStatus.StreamNotFound)
-            {
-                return new StreamMetadataResult(streamId, -1);
-            }
+		var page = await ReadStreamBackwardsInternal(
+			idInfo.MetadataSqlStreamId.IdOriginal,
+			StreamVersion.End,
+			1,
+			true,
+			null,
+			cancellationToken
+		).ConfigureAwait(false);
 
-            var payload = page.Messages.FirstOrDefault(); //TODO: What to do when page.Messages.Count() == 0?
+		if (page.Status == PageReadStatus.StreamNotFound) {
+			return new StreamMetadataResult(streamId, -1);
+		}
 
-            var json = await payload.GetJsonData(cancellationToken).ConfigureAwait(false);
-            var msg = SimpleJson.DeserializeObject<MetadataMessage>(json);
-            return new StreamMetadataResult(streamId, page.LastStreamVersion, msg.MaxAge, msg.MaxCount, msg.MetaJson);
-        }
+		var payload = page.Messages.FirstOrDefault(); //TODO: What to do when page.Messages.Count() == 0?
 
-        protected override async Task<SetStreamMetadataResult> SetStreamMetadataInternal(
-            string streamId,
-            int expectedVersion,
-            int? maxAge,
-            int? maxCount,
-            string metadataJson,
-            CancellationToken cancellationToken)
-        {
-            GuardAgainstDisposed();
-            cancellationToken.ThrowIfCancellationRequested();
+		var json = await payload.GetJsonData(cancellationToken).ConfigureAwait(false);
+		var msg = SimpleJson.DeserializeObject<MetadataMessage>(json);
+		return new StreamMetadataResult(streamId, page.LastStreamVersion, msg.MaxAge, msg.MaxCount, msg.MetaJson);
+	}
 
-            var metadataMessage = new MetadataMessage
-            {
-                StreamId = streamId,
-                MaxAge = maxAge,
-                MaxCount = maxCount,
-                MetaJson = metadataJson
-            };
-            var json = SimpleJson.SerializeObject(metadataMessage);
-            var messageId = MetadataMessageIdGenerator.Create(
-                streamId,
-                expectedVersion,
-                json
-            );
-            var message = new NewStreamMessage(messageId, "$stream-metadata", json);
+	protected override async Task<SetStreamMetadataResult> SetStreamMetadataInternal(
+		string streamId,
+		int expectedVersion,
+		int? maxAge,
+		int? maxCount,
+		string metadataJson,
+		CancellationToken cancellationToken) {
+		GuardAgainstDisposed();
+		cancellationToken.ThrowIfCancellationRequested();
 
-            var idinfo = new StreamIdInfo(streamId);
-            var result = await AppendToStreamInternal(
-                idinfo.MetadataSqlStreamId.IdOriginal,
-                expectedVersion,
-                new[] { message },
-                cancellationToken).ConfigureAwait(false);
+		var metadataMessage = new MetadataMessage {
+			StreamId = streamId,
+			MaxAge = maxAge,
+			MaxCount = maxCount,
+			MetaJson = metadataJson
+		};
+		var json = SimpleJson.SerializeObject(metadataMessage);
+		var messageId = MetadataMessageIdGenerator.Create(
+			streamId,
+			expectedVersion,
+			json
+		);
+		var message = new NewStreamMessage(messageId, "$stream-metadata", json);
+
+		var idinfo = new StreamIdInfo(streamId);
+		var result = await AppendToStreamInternal(
+			idinfo.MetadataSqlStreamId.IdOriginal,
+			expectedVersion,
+			new[] { message },
+			cancellationToken).ConfigureAwait(false);
 
 
-            CheckStreamMaxCount(streamId, maxCount, cancellationToken).Wait(cancellationToken);
+		CheckStreamMaxCount(streamId, maxCount, cancellationToken).Wait(cancellationToken);
 
-            return new SetStreamMetadataResult(result.CurrentVersion);
-        }
-    }
+		return new SetStreamMetadataResult(result.CurrentVersion);
+	}
 }

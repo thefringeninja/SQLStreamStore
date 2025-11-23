@@ -1,79 +1,65 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient
-{
-    using System;
-    using System.IO;
-    using System.Linq;
-    using System.Net.Http;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Newtonsoft.Json;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Serialization;
-    using Tavis.UriTemplates;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient;
 
-    internal static class HalClientExtensions
-    {
-        public static Task<IHalClient> BuildAndExecuteAsync(
-            this IHalClient client,
-            string relationship,
-            object parameters,
-            Func<string, Task<HttpResponseMessage>> command)
-        {
-            var resource = client.Current.FirstOrDefault(r => r.Links.Any(l => l.Rel == relationship));
-            if(resource == null)
-                throw new FailedToResolveRelationship(relationship);
+using System;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+using SqlStreamStore.Internal.HoneyBearHalClient.Serialization;
+using Tavis.UriTemplates;
 
-            var link = resource.Links.FirstOrDefault(l => l.Rel == relationship);
-            return ExecuteAsync(client, Construct(resource.BaseAddress, link, parameters), command);
-        }
+internal static class HalClientExtensions {
+	public static Task<IHalClient> BuildAndExecuteAsync(
+		this IHalClient client,
+		string relationship,
+		object? parameters,
+		Func<string, Task<HttpResponseMessage>> command) {
+		var resource = client.Current.FirstOrDefault(r => r.Links.Any(l => l.Rel == relationship))
+		               ?? throw new FailedToResolveRelationship(relationship);
 
-        public static async Task<IHalClient> ExecuteAsync(
-            this IHalClient client,
-            string uri,
-            Func<string, Task<HttpResponseMessage>> command)
-        {
-            var result = await command(uri);
+		var link = resource.Links.FirstOrDefault(l => l.Rel == relationship)
+		           ?? throw new FailedToResolveRelationship(relationship);
+		return ExecuteAsync(client, Construct(resource.BaseAddress, link, parameters), command);
+	}
 
-            var current =
-                new[]
-                {
-                    (result.Content.Headers.ContentLength == 0
-                        ? new Resource()
-                        : await result.Content.ReadResource())
-                    .WithBaseAddress(new Uri(client.Client.BaseAddress, uri))
-                };
+	public static async Task<IHalClient> ExecuteAsync(
+		this IHalClient client,
+		string uri,
+		Func<string, Task<HttpResponseMessage>> command) {
+		var result = await command(uri);
 
-            return new HalClient(client, current, result.StatusCode);
-        }
+		var current =
+			new[]
+			{
+				(result.Content.Headers.ContentLength == 0
+					? new Resource()
+					: await result.Content.ReadResource())
+				.WithBaseAddress(new Uri(client.Client.BaseAddress, uri))
+			};
 
-        private static async Task<IResource> ReadResource(this HttpContent content)
-        {
-            var stream = await content.ReadAsStreamAsync();
+		return new HalClient(client, current, result.StatusCode);
+	}
 
-            using(var reader = new JsonTextReader(new StreamReader(stream))
-            {
-                CloseInput = false
-            })
-            {
-                return await HalResourceJsonReader.ReadResource(reader, CancellationToken.None);
-            }
-        }
+	private static async Task<IResource> ReadResource(this HttpContent content) {
+		var stream = await content.ReadAsStreamAsync();
 
-        public static string Construct(Uri baseAddress, ILink link, object parameters)
-        {
-            if(!link.Templated)
-                return new Uri(baseAddress, link.Href).ToString();
+		return await HalResourceJsonReader.ReadResource(stream, CancellationToken.None);
+	}
 
-            if(parameters == null)
-                throw new TemplateParametersAreRequired(link);
+	public static string Construct(Uri baseAddress, ILink link, object? parameters) {
+		if (!link.Templated)
+			return new Uri(baseAddress, link.Href).ToString();
 
-            var template = new UriTemplate(
-                new Uri(baseAddress, link.Href).ToString(),
-                caseInsensitiveParameterNames: true);
-            template.AddParameters(parameters);
-            return template.Resolve();
-        }
+		// if(parameters == null)
+		//     throw new TemplateParametersAreRequired(link);
 
-        public static string Relationship(string rel, string curie) => curie == null ? rel : $"{curie}:{rel}";
-    }
+		var template = new UriTemplate(
+			new Uri(baseAddress, link.Href).ToString(),
+			caseInsensitiveParameterNames: true);
+		template.AddParameters(parameters);
+		return template.Resolve();
+	}
+
+	public static string Relationship(string rel, string? curie) => curie == null ? rel : $"{curie}:{rel}";
 }

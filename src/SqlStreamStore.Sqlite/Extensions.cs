@@ -1,65 +1,55 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Linq;
-    using System.Reflection;
-    using Microsoft.Data.Sqlite;
+namespace SqlStreamStore;
 
-    internal static class Extensions
-    {
-        public static T ExecuteScalar<T>(this SqliteCommand command, T defaultValue = default)
-        {
-            var obj = command.ExecuteScalar();
-            if(obj == DBNull.Value || obj == null)
-            {
-                return defaultValue;
-            }
-            
-            var resolvedType = typeof(T);
-            Type actionableType = resolvedType;
-            if(resolvedType.IsGenericType)
-            {
-                // get the generic type's "T" type.
-                actionableType = resolvedType.GetGenericArguments().First();
-            }
-            
-            var methodInfo = actionableType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null,
-                new [] { typeof(string) }, null);
+using System;
+using System.Linq;
+using System.Reflection;
+using Microsoft.Data.Sqlite;
 
-            if(methodInfo != null)
-            {
-                return (T)methodInfo.Invoke(obj, new[] { obj.ToString() });
-            }
+internal static class Extensions {
+	public static T ExecuteScalar<T>(this SqliteCommand command, T defaultValue = default) {
+		var obj = command.ExecuteScalar();
+		if (obj == DBNull.Value || obj == null) {
+			return defaultValue;
+		}
 
-            return (T) obj;
-        }
+		var resolvedType = typeof(T);
+		Type actionableType = resolvedType;
+		if (resolvedType.IsGenericType) {
+			// get the generic type's "T" type.
+			actionableType = resolvedType.GetGenericArguments().First();
+		}
 
-        public static T ReadScalar<T>(this SqliteDataReader reader, int columnIndex, T defaultValue = default)
-        {
-            if(reader.IsDBNull(columnIndex))
-            {
-                return defaultValue;
-            }
+		var methodInfo = actionableType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null,
+			new[] { typeof(string) }, null);
 
-            var obj = reader.GetValue(columnIndex);
-            
-            var resolvedType = typeof(T);
-            Type actionableType = resolvedType;
-            if(resolvedType.IsGenericType)
-            {
-                // get the generic type's "T" type.
-                actionableType = resolvedType.GetGenericArguments().First();
-            }
-            
-            var methodInfo = actionableType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null,
-                new [] { typeof(string) }, null);
+		if (methodInfo != null) {
+			return (T)methodInfo.Invoke(obj, new[] { obj.ToString() });
+		}
 
-            if(methodInfo != null)
-            {
-                return (T)methodInfo.Invoke(obj, new[] { obj.ToString() });
-            }
+		return (T)obj;
+	}
 
-            return (T) obj;
-        }
-    }
+	public static T ReadScalar<T>(this SqliteDataReader reader, int columnIndex, T defaultValue = default) {
+		if (reader.IsDBNull(columnIndex)) {
+			return defaultValue;
+		}
+
+		var obj = reader.GetValue(columnIndex);
+
+		var resolvedType = typeof(T);
+		Type actionableType = resolvedType;
+		if (resolvedType.IsGenericType) {
+			// get the generic type's "T" type.
+			actionableType = resolvedType.GetGenericArguments().First();
+		}
+
+		var methodInfo = actionableType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null,
+			new[] { typeof(string) }, null);
+
+		if (methodInfo != null) {
+			return (T)methodInfo.Invoke(obj, new[] { obj.ToString() });
+		}
+
+		return (T)obj;
+	}
 }

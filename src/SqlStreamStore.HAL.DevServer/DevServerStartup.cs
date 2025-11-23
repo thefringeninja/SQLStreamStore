@@ -1,53 +1,48 @@
-﻿namespace SqlStreamStore.HAL.DevServer
-{
-    using System;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Builder;
-    using Microsoft.AspNetCore.Hosting;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.Extensions.DependencyInjection;
-    using MidFunc = System.Func<
-        Microsoft.AspNetCore.Http.HttpContext,
-        System.Func<System.Threading.Tasks.Task>,
-        System.Threading.Tasks.Task
-    >;
+﻿namespace SqlStreamStore.HAL.DevServer;
 
-    internal class DevServerStartup : IStartup
-    {
-        private readonly IStreamStore _streamStore;
-        private readonly SqlStreamStoreMiddlewareOptions _options;
+using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using MidFunc = System.Func<
+	Microsoft.AspNetCore.Http.HttpContext,
+	System.Func<System.Threading.Tasks.Task>,
+	System.Threading.Tasks.Task
+>;
 
-        public DevServerStartup(
-            IStreamStore streamStore,
-            SqlStreamStoreMiddlewareOptions options)
-        {
-            _streamStore = streamStore;
-            _options = options;
-        }
+internal class DevServerStartup : IStartup {
+	private readonly IStreamStore _streamStore;
+	private readonly SqlStreamStoreMiddlewareOptions _options;
 
-        public IServiceProvider ConfigureServices(IServiceCollection services) => services
-            .AddResponseCompression(options => options.MimeTypes = new[] { "application/hal+json" })
-            .AddSqlStreamStoreHal()
-            .BuildServiceProvider();
+	public DevServerStartup(
+		IStreamStore streamStore,
+		SqlStreamStoreMiddlewareOptions options) {
+		_streamStore = streamStore;
+		_options = options;
+	}
 
-        public void Configure(IApplicationBuilder app) => app
-            .UseResponseCompression()
-            .Use(VaryAccept)
-            .UseSqlStreamStoreBrowser()
-            .UseSqlStreamStoreHal(_streamStore, _options);
+	public IServiceProvider ConfigureServices(IServiceCollection services) => services
+		.AddResponseCompression(options => options.MimeTypes = new[] { "application/hal+json" })
+		.AddSqlStreamStoreHal()
+		.BuildServiceProvider();
 
-        private static MidFunc VaryAccept => (context, next) =>
-        {
-            Task Vary()
-            {
-                context.Response.Headers.AppendCommaSeparatedValues("Vary", "Accept");
+	public void Configure(IApplicationBuilder app) => app
+		.UseResponseCompression()
+		.Use(VaryAccept)
+		.UseSqlStreamStoreBrowser()
+		.UseSqlStreamStoreHal(_streamStore, _options);
 
-                return Task.CompletedTask;
-            }
+	private static MidFunc VaryAccept => (context, next) => {
+		Task Vary() {
+			context.Response.Headers.AppendCommaSeparatedValues("Vary", "Accept");
 
-            context.Response.OnStarting(Vary);
+			return Task.CompletedTask;
+		}
 
-            return next();
-        };
-    }
+		context.Response.OnStarting(Vary);
+
+		return next();
+	};
 }

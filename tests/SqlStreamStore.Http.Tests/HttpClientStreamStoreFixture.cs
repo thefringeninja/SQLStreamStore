@@ -1,70 +1,68 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Linq;
-    using System.Net.Http;
-    using Microsoft.AspNetCore.Builder;
-    using Microsoft.AspNetCore.Hosting;
-    using Microsoft.AspNetCore.TestHost;
-    using SqlStreamStore.HAL;
-    using SqlStreamStore.Infrastructure;
+namespace SqlStreamStore;
 
-    public class HttpClientStreamStoreFixture : IStreamStoreFixture
-    {
-        private readonly InMemoryStreamStore _inMemoryStreamStore;
-        private readonly TestServer _server;
+using System;
+using System.Linq;
+using System.Net.Http;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.HAL;
+using SqlStreamStore.Infrastructure;
 
-        public HttpClientStreamStoreFixture()
-        {
-            _inMemoryStreamStore = new InMemoryStreamStore(() => GetUtcNow());
+public class HttpClientStreamStoreFixture : IStreamStoreFixture {
+	private readonly InMemoryStreamStore _inMemoryStreamStore;
+	private readonly TestServer _server;
 
-            var random = new Random();
+	public HttpClientStreamStoreFixture(ILoggerFactory loggerFactory) {
+		_inMemoryStreamStore = new InMemoryStreamStore(() => GetUtcNow(), loggerFactory.CreateLogger<InMemoryStreamStore>());
 
-            var segments = Enumerable.Range(0, random.Next(1, 3)).Select(_ => Guid.NewGuid()).ToArray();
-            var basePath = $"/{string.Join("/", segments)}";
+		var random = new Random();
 
-            var webHostBuilder = new WebHostBuilder()
-                .ConfigureServices(services => services.AddSqlStreamStoreHal())
-                .Configure(builder => builder.Map(basePath, inner => inner.UseSqlStreamStoreHal(_inMemoryStreamStore)));
+		var segments = Enumerable.Range(0, random.Next(1, 3)).Select(_ => Guid.NewGuid()).ToArray();
+		var basePath = $"/{string.Join("/", segments)}";
 
-            _server = new TestServer(webHostBuilder);
+		var builder = WebApplication.CreateBuilder();
+		builder.Services.AddSingleton<ILoggerFactory>(loggerFactory);
+		builder.Services.AddSqlStreamStoreHal();
+		builder.WebHost.UseTestServer();
+		var app = builder.Build();
+		app.Map(basePath, inner => inner.UseSqlStreamStoreHal(_inMemoryStreamStore));
 
-            var handler = new RedirectingHandler
-            {
-                InnerHandler = _server.CreateHandler()
-            };
+		_server = app.GetTestServer();
 
-            Store = new HttpClientSqlStreamStore(
-                new HttpClientSqlStreamStoreSettings
-                {
-                    GetUtcNow = () => GetUtcNow(),
-                    BaseAddress = new UriBuilder
-                    {
-                        Path = basePath.Length == 1 ? basePath : $"{basePath}/"
-                    }.Uri,
-                    CreateHttpClient = () => new HttpClient(handler, false)
-                });
-        }
+		app.StartAsync().Wait();
 
-        public void Dispose()
-        {
-            Store.Dispose();
-            _server.Dispose();
-            _inMemoryStreamStore.Dispose();
-        }
+		var handler = new RedirectingHandler {
+			InnerHandler = _server.CreateHandler()
+		};
 
-        public IStreamStore Store { get; }
+		Store = new HttpClientSqlStreamStore(
+			new HttpClientSqlStreamStoreSettings {
+				GetUtcNow = () => GetUtcNow(),
+				BaseAddress = new UriBuilder {
+					Path = basePath.Length == 1 ? basePath : $"{basePath}/"
+				}.Uri,
+				CreateHttpClient = () => new HttpClient(handler, false)
+			});
+	}
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public void Dispose() {
+		Store.Dispose();
+		_server.Dispose();
+		_inMemoryStreamStore.Dispose();
+	}
 
-        public long MinPosition { get; set; } = 0;
+	public IStreamStore Store { get; }
 
-        public int MaxSubscriptionCount { get; set; } = 500;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public bool DisableDeletionTracking
-        {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
-    }
+	public long MinPosition { get; set; } = 0;
+
+	public int MaxSubscriptionCount { get; set; } = 500;
+
+	public bool DisableDeletionTracking {
+		get => throw new NotSupportedException();
+		set => throw new NotSupportedException();
+	}
 }

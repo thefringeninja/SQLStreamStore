@@ -1,49 +1,43 @@
-﻿namespace SqlStreamStore.HAL.Tests
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Net.Http;
-    using System.Threading.Tasks;
-    using Shouldly;
-    using SqlStreamStore.Streams;
-    using Xunit;
-    using Xunit.Abstractions;
+﻿namespace SqlStreamStore.HAL.Tests;
 
-    public class HeadersTests : IDisposable
-    {
-        private const string StreamId = "a-stream";
-        private readonly SqlStreamStoreHalMiddlewareFixture _fixture;
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Shouldly;
+using SqlStreamStore.Streams;
+using Xunit;
+using Xunit.Abstractions;
 
-        public HeadersTests(ITestOutputHelper output)
-        {
-            _fixture = new SqlStreamStoreHalMiddlewareFixture(output);
-        }
+public class HeadersTests : IDisposable {
+	private const string StreamId = "a-stream";
+	private readonly SqlStreamStoreHalMiddlewareFixture _fixture;
 
-        public void Dispose() => _fixture.Dispose();
+	public HeadersTests(ITestOutputHelper output) {
+		_fixture = new SqlStreamStoreHalMiddlewareFixture(output);
+	}
 
-        public static IEnumerable<object[]> Methods()
-        {
-            yield return new object[] { HttpMethod.Head };
-            yield return new object[] { HttpMethod.Get };
-        }
+	public void Dispose() => _fixture.Dispose();
 
-        [Theory, MemberData(nameof(Methods))]
-        public async Task all_stream_head_link(HttpMethod method)
-        {
-            await _fixture.WriteNMessages(StreamId, 10);
+	public static IEnumerable<object[]> Methods() {
+		yield return new object[] { HttpMethod.Head };
+		yield return new object[] { HttpMethod.Get };
+	}
 
-            var position = await _fixture.StreamStore.ReadHeadPosition();
+	[Theory, MemberData(nameof(Methods))]
+	public async Task all_stream_head_link(HttpMethod method) {
+		await _fixture.WriteNMessages(StreamId, 10);
 
-            using(var response = await _fixture.HttpClient.SendAsync(
-                new HttpRequestMessage(
-                    method,
-                    LinkFormatter.ReadAllBackwards(Position.End, 20, true))))
-            {
-                response.IsSuccessStatusCode.ShouldBeTrue();
+		var position = await _fixture.StreamStore.ReadHeadPosition();
 
-                response.Headers.GetValues(Constants.Headers.HeadPosition)
-                    .ShouldBe(new[] { $"{position}" });
-            }
-        }
-    }
+		using (var response = await _fixture.HttpClient.SendAsync(
+			       new HttpRequestMessage(
+				       method,
+				       LinkFormatter.ReadAllBackwards(Position.End, 20, true)))) {
+			response.IsSuccessStatusCode.ShouldBeTrue();
+
+			response.Headers.GetValues(Constants.Headers.HeadPosition)
+				.ShouldBe(new[] { $"{position}" });
+		}
+	}
 }

@@ -1,85 +1,75 @@
-namespace SqlStreamStore.HAL
-{
-    using System;
-    using System.Linq;
-    using System.Net.Http.Headers;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore.HAL;
 
-    internal static class HttpContextExtensions
-    {
-        private static readonly string[] s_NotModifiedRequiredHeaders =
-        {
-            "cache-control",
-            "content-location",
-            "date",
-            "etag",
-            "expires",
-            "vary"
-        };
+using System;
+using System.Linq;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using SqlStreamStore.Streams;
 
-        public static Task WriteResponse(this HttpContext context, Response response)
-            => context.Request.IfNoneMatch(response)
-                ? WriteNotModifiedResponse(context, response)
-                : WriteResponseInternal(context, response);
+internal static class HttpContextExtensions {
+	private static readonly string[] s_NotModifiedRequiredHeaders =
+	{
+		"cache-control",
+		"content-location",
+		"date",
+		"etag",
+		"expires",
+		"vary"
+	};
 
-        private static bool IfNoneMatch(this HttpRequest request, Response response)
-        {
-            if(!request.Headers.TryGetValue(Constants.Headers.IfNoneMatch, out var ifNoneMatch)
-               || !response.Headers.TryGetValue(Constants.Headers.ETag, out var eTags)
-               || eTags.Length == 0)
-            {
-                return false;
-            }
+	public static Task WriteResponse(this HttpContext context, Response response)
+		=> context.Request.IfNoneMatch(response)
+			? WriteNotModifiedResponse(context, response)
+			: WriteResponseInternal(context, response);
 
-            foreach(var candidate in ifNoneMatch)
-            {
-                if(string.Equals(eTags[0], candidate, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
+	private static bool IfNoneMatch(this HttpRequest request, Response response) {
+		if (!request.Headers.TryGetValue(Constants.Headers.IfNoneMatch, out var ifNoneMatch)
+		    || !response.Headers.TryGetValue(Constants.Headers.ETag, out var eTags)
+		    || eTags.Length == 0) {
+			return false;
+		}
 
-            return false;
-        }
+		foreach (var candidate in ifNoneMatch) {
+			if (string.Equals(eTags[0], candidate, StringComparison.Ordinal)) {
+				return true;
+			}
+		}
 
-        private static Task WriteNotModifiedResponse(HttpContext context, Response response)
-        {
-            context.Response.StatusCode = 304;
-            foreach(var header in s_NotModifiedRequiredHeaders.Where(response.Headers.Keys.Contains))
-            {
-                context.Response.Headers.AppendCommaSeparatedValues(header, response.Headers[header]);
-            }
+		return false;
+	}
 
-            return Task.CompletedTask;
-        }
+	private static Task WriteNotModifiedResponse(HttpContext context, Response response) {
+		context.Response.StatusCode = 304;
+		foreach (var header in s_NotModifiedRequiredHeaders.Where(response.Headers.Keys.Contains)) {
+			context.Response.Headers.AppendCommaSeparatedValues(header, response.Headers[header]);
+		}
 
-        private static Task WriteResponseInternal(HttpContext context, Response response)
-        {
-            context.Response.StatusCode = response.StatusCode;
+		return Task.CompletedTask;
+	}
 
-            foreach(var header in response.Headers)
-            {
-                context.Response.Headers.AppendCommaSeparatedValues(header.Key, header.Value);
-            }
+	private static Task WriteResponseInternal(HttpContext context, Response response) {
+		context.Response.StatusCode = response.StatusCode;
 
-            return response.WriteBody(context.Response, context.RequestAborted);
-        }
+		foreach (var header in response.Headers) {
+			context.Response.Headers.AppendCommaSeparatedValues(header.Key, header.Value);
+		}
 
-        public static int GetExpectedVersion(this HttpRequest request)
-            => int.TryParse(
-                request.Headers[Constants.Headers.ExpectedVersion],
-                out var expectedVersion)
-                ? expectedVersion
-                : ExpectedVersion.Any;
+		return response.WriteBody(context.Response, context.RequestAborted);
+	}
 
-        public static string[] GetAcceptHeaders(this HttpRequest contextRequest)
-            => Array.ConvertAll(
-                contextRequest.Headers
-                    .GetCommaSeparatedValues("Accept"),
-                value => MediaTypeWithQualityHeaderValue.TryParse(value, out var header)
-                    ? header.MediaType
-                    : null);
-    }
+	public static int GetExpectedVersion(this HttpRequest request)
+		=> int.TryParse(
+			request.Headers[Constants.Headers.ExpectedVersion],
+			out var expectedVersion)
+			? expectedVersion
+			: ExpectedVersion.Any;
+
+	public static string?[] GetAcceptHeaders(this HttpRequest contextRequest)
+		=> Array.ConvertAll(
+			contextRequest.Headers
+				.GetCommaSeparatedValues("Accept"),
+			value => MediaTypeWithQualityHeaderValue.TryParse(value, out var header)
+				? header.MediaType
+				: null);
 }

@@ -1,138 +1,115 @@
-namespace SqlStreamStore.HAL.Tests
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Net.Http;
-    using System.Threading.Tasks;
-    using Newtonsoft.Json.Linq;
+namespace SqlStreamStore.HAL.Tests;
 
-    internal static class HttpResponseMessageExtensions
-    {
-        public static async Task<Resource> AsHal(this HttpResponseMessage response)
-            => ParseResource(JObject.Parse(await response.Content.ReadAsStringAsync()));
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 
-        /// <summary>
-        /// https://github.com/wis3guy/HalClient.Net/blob/master/HalClient.Net/Parser/HalJsonParser.cs
-        /// </summary>
-        /// <param name="outer"></param>
-        /// <returns></returns>
-        private static Resource ParseResource(JObject outer)
-        {
-            var links = new List<Link>();
-            var embedded = new List<(string, Resource)>();
-            var state = new JObject();
+internal static class HttpResponseMessageExtensions {
+	public static async Task<Resource> AsHal(this HttpResponseMessage response)
+		=> ParseResource(JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject());
 
-            foreach(var inner in outer.Properties())
-            {
-                var type = inner.Value.Type.ToString();
+	/// <summary>
+	/// https://github.com/wis3guy/HalClient.Net/blob/master/HalClient.Net/Parser/HalJsonParser.cs
+	/// </summary>
+	/// <param name="outer"></param>
+	/// <returns></returns>
+	private static Resource ParseResource(JsonObject outer) {
+		var links = new List<Link>();
+		var embedded = new List<(string, Resource)>();
+		var state = JsonNode.Parse("{}")!.AsObject();
 
-                if(inner.Value.Type == JTokenType.Object)
-                {
-                    var value = (JObject) inner.Value;
+		foreach (var (propetyName, inner) in outer) {
+			if (inner is JsonObject o) {
+				switch (propetyName) {
+					case "_links":
+						links.AddRange(ParseObjectOrArrayOfObjects(o, ParseLink));
+						break;
+					case "_embedded":
+						embedded.AddRange(ParseObjectOrArrayOfObjects(o, ParseEmbeddedResource));
+						break;
+					default:
+						state.Add(propetyName, o.DeepClone());
+						break;
+				}
+			} else {
+				switch (propetyName) {
+					case "_links":
+					case "_embedded":
+						if (inner is not null) {
+							throw new FormatException(
+								$"Invalid value for {propetyName}: {inner}");
+						}
+						break;
+					default:
+						state.Add(propetyName, inner?.DeepClone());
+						break;
+				}
+			}
+		}
 
-                    switch(inner.Name)
-                    {
-                        case "_links":
-                            links.AddRange(ParseObjectOrArrayOfObjects(value, ParseLink));
-                            break;
-                        case "_embedded":
-                            embedded.AddRange(ParseObjectOrArrayOfObjects(value, ParseEmbeddedResource));
-                            break;
-                        default:
-                            state.Add(inner.Name, inner.Value);
-                            break;
-                    }
-                }
-                else
-                {
-                    var value = inner.Value.ToString();
+		return new Resource(state, links.ToArray(), embedded.ToArray());
+	}
 
-                    switch(inner.Name)
-                    {
-                        case "_links":
-                        case "_embedded":
-                            if(inner.Value.Type != JTokenType.Null)
-                            {
-                                throw new FormatException(
-                                    $"Invalid value for {inner.Name}: {value}");
-                            }
-                            break;
-                        default:
-                            state.Add(inner.Name, inner.Value);
-                            break;
-                    }
-                }
-            }
+	private static (string, Resource) ParseEmbeddedResource(JsonObject outer, string rel)
+		=> (rel, ParseResource(outer));
 
-            return new Resource(state, links.ToArray(), embedded.ToArray());
-        }
+	private static Link ParseLink(JsonObject outer, string rel) {
+		var link = new Link { Rel = rel };
 
-        private static (string, Resource) ParseEmbeddedResource(JObject outer, string rel)
-            => (rel, ParseResource(outer));
+		string? href = null;
 
-        private static Link ParseLink(JObject outer, string rel)
-        {
-            var link = new Link { Rel = rel };
+		foreach (var (propertyName, inner) in outer) {
+			if (inner is null) {
+				continue;
+			}
 
-            string href = null;
+			switch (propertyName) {
+				case "href":
+					href = inner.GetValue<string>();
+					break;
+				case "templated":
 
-            foreach(var inner in outer.Properties())
-            {
-                var value = inner.Value.ToString();
+					//link.Templated = value.Equals("true", StringComparison.OrdinalIgnoreCase);
+					break;
+				case "type":
+					//link.Type = value;
+					break;
+				case "deprication":
+					//link.SetDeprecation(value);
+					break;
+				case "name":
+					//link.Name = value;
+					break;
+				case "profile":
+					//link.SetProfile(value);
+					break;
+				case "title":
+					link.Title = inner.GetValue<string>();
+					break;
+				case "hreflang":
+					//link.HrefLang = value;
+					break;
+				default:
+					throw new NotSupportedException("Unsupported link attribute encountered: " + propertyName);
+			}
+		}
 
-                if(string.IsNullOrEmpty(value))
-                    continue; // nothing to assign, just leave the default value ...
+		link.Href = href;
 
-                var attribute = inner.Name.ToLowerInvariant();
+		return link;
+	}
 
-                switch(attribute)
-                {
-                    case "href":
-                        href = value;
-                        break;
-                    case "templated":
-                        //link.Templated = value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                        break;
-                    case "type":
-                        //link.Type = value;
-                        break;
-                    case "deprication":
-                        //link.SetDeprecation(value);
-                        break;
-                    case "name":
-                        //link.Name = value;
-                        break;
-                    case "profile":
-                        //link.SetProfile(value);
-                        break;
-                    case "title":
-                        link.Title = value;
-                        break;
-                    case "hreflang":
-                        //link.HrefLang = value;
-                        break;
-                    default:
-                        throw new NotSupportedException("Unsupported link attribute encountered: " + attribute);
-                }
-            }
-
-            link.Href = href;
-
-            return link;
-        }
-
-        private static IEnumerable<T> ParseObjectOrArrayOfObjects<T>(JObject outer, Func<JObject, string, T> factory)
-        {
-            foreach(var inner in outer.Properties())
-            {
-                var rel = inner.Name;
-
-                if(inner.Value.Type == JTokenType.Array)
-                    foreach(var child in inner.Value.Children<JObject>())
-                        yield return factory(child, rel);
-                else
-                    yield return factory((JObject) inner.Value, rel);
-            }
-        }
-    }
+	private static IEnumerable<T> ParseObjectOrArrayOfObjects<T>(JsonObject outer, Func<JsonObject, string, T> factory) {
+		foreach (var (rel, inner) in outer) {
+			if (inner is JsonArray array) {
+				foreach (var child in array) {
+					if (child is JsonObject childObject)
+						yield return factory(childObject, rel);
+				}
+			} else if (inner is JsonObject o)
+				yield return factory(o, rel);
+		}
+	}
 }

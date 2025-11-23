@@ -1,98 +1,87 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Threading.Tasks;
-    using MySqlConnector;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.TestUtils.MySql;
+namespace SqlStreamStore;
 
-    public class MySqlStreamStoreFixture : IStreamStoreFixture
-    {
-        private readonly Action _onDispose;
-        private bool _preparedPreviously;
-        private readonly MySqlStreamStoreSettings _settings;
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using MySqlConnector;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.TestUtils.MySql;
 
-        public MySqlStreamStoreFixture(
-            MySqlContainer dockerInstance,
-            string databaseName,
-            Action onDispose)
-        {
-            _onDispose = onDispose;
-            DatabaseName = databaseName;
-            var connectionString = dockerInstance.ConnectionString;
+public class MySqlStreamStoreFixture : IStreamStoreFixture {
+	private readonly Action _onDispose;
+	private bool _preparedPreviously;
+	private readonly MySqlStreamStoreSettings _settings;
 
-            _settings = new MySqlStreamStoreSettings(connectionString)
-            {
-                GetUtcNow = () => GetUtcNow(),
-                DisableDeletionTracking = false,
-                AppendDeadlockRetryAttempts = 25
-            };
-        }
+	public MySqlStreamStoreFixture(
+		MySqlContainer dockerInstance,
+		string databaseName,
+		Action onDispose,
+		ILoggerFactory loggerFactory) {
+		_onDispose = onDispose;
+		DatabaseName = databaseName;
+		var connectionString = dockerInstance.ConnectionString;
 
-        public void Dispose()
-        {
-            Store.Dispose();
-            MySqlStreamStore = null;
-            _onDispose();
-        }
+		_settings = new MySqlStreamStoreSettings(connectionString, loggerFactory) {
+			GetUtcNow = () => GetUtcNow(),
+			DisableDeletionTracking = false,
+			AppendDeadlockRetryAttempts = 25
+		};
+	}
 
-        public string DatabaseName { get; }
+	public void Dispose() {
+		Store.Dispose();
+		MySqlStreamStore = null!;
+		_onDispose();
+	}
 
-        public IStreamStore Store => MySqlStreamStore;
+	public string DatabaseName { get; }
 
-        public MySqlStreamStore MySqlStreamStore { get; private set; }
+	public IStreamStore Store => MySqlStreamStore;
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public MySqlStreamStore MySqlStreamStore { get; private set; } = null!;
 
-        public long MinPosition { get; set; } = 0;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public int MaxSubscriptionCount { get; set; } = 500;
+	public long MinPosition { get; set; } = 0;
 
-        public bool DisableDeletionTracking
-        {
-            get => _settings.DisableDeletionTracking;
-            set => _settings.DisableDeletionTracking = value;
-        }
+	public int MaxSubscriptionCount { get; set; } = 500;
 
-        public async Task Prepare()
-        {
-            _settings.DisableDeletionTracking = false;
-            MySqlStreamStore = new MySqlStreamStore(_settings);
+	public bool DisableDeletionTracking {
+		get => _settings.DisableDeletionTracking;
+		set => _settings.DisableDeletionTracking = value;
+	}
 
-            await MySqlStreamStore.CreateSchemaIfNotExists();
-            if (_preparedPreviously)
-            {
-                using (var connection = new MySqlConnection(_settings.ConnectionString))
-                {
-                    connection.Open();
+	public async Task Prepare() {
+		_settings.DisableDeletionTracking = false;
+		MySqlStreamStore = new MySqlStreamStore(_settings);
 
-                    var commandText = "DELETE FROM messages";
-                    using (var command = new MySqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+		await MySqlStreamStore.CreateSchemaIfNotExists();
+		if (_preparedPreviously) {
+			using (var connection = new MySqlConnection(_settings.ConnectionString)) {
+				connection.Open();
 
-                    commandText = "DELETE FROM streams";
-                    using (var command = new MySqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+				var commandText = "DELETE FROM messages";
+				using (var command = new MySqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
 
-                    commandText = "ALTER TABLE streams AUTO_INCREMENT = 1";
-                    using (var command = new MySqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+				commandText = "DELETE FROM streams";
+				using (var command = new MySqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
 
-                    commandText = "ALTER TABLE messages AUTO_INCREMENT = 1";
-                    using (var command = new MySqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
-                }
-            }
+				commandText = "ALTER TABLE streams AUTO_INCREMENT = 1";
+				using (var command = new MySqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
 
-            _preparedPreviously = true;
-        }
-    }
+				commandText = "ALTER TABLE messages AUTO_INCREMENT = 1";
+				using (var command = new MySqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
+			}
+		}
+
+		_preparedPreviously = true;
+	}
 }

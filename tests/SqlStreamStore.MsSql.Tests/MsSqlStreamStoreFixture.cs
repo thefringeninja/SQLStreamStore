@@ -1,69 +1,64 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.TestUtils.MsSql;
+namespace SqlStreamStore;
 
-    public class MsSqlStreamStoreFixture : IStreamStoreFixture
-    {
-        private readonly Action _onDispose;
-        private readonly MsSqlStreamStoreSettings _settings;
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.TestUtils.MsSql;
 
-        public MsSqlStreamStoreFixture(
-            string schema,
-            SqlServerContainer dockerInstance,
-            string databaseName,
-            Action onDispose)
-        {
-            _onDispose = onDispose;
+public class MsSqlStreamStoreFixture : IStreamStoreFixture {
+	private readonly Action _onDispose;
+	private readonly MsSqlStreamStoreSettings _settings;
 
-            DatabaseName = databaseName;
-            var connectionStringBuilder = dockerInstance.CreateConnectionStringBuilder();
-            connectionStringBuilder.MultipleActiveResultSets = true;
-            connectionStringBuilder.InitialCatalog = DatabaseName;
-            ConnectionString = connectionStringBuilder.ToString();
+	public MsSqlStreamStoreFixture(
+		string schema,
+		SqlServerContainer dockerInstance,
+		string databaseName,
+		Action onDispose,
+		ILoggerFactory loggerFactory) {
+		_onDispose = onDispose;
 
-            _settings = new MsSqlStreamStoreSettings(ConnectionString)
-            {
-                Schema = schema,
-                GetUtcNow = () => GetUtcNow(),
-            };
-        }
+		DatabaseName = databaseName;
+		var connectionStringBuilder = dockerInstance.CreateConnectionStringBuilder();
+		connectionStringBuilder.MultipleActiveResultSets = true;
+		connectionStringBuilder.InitialCatalog = DatabaseName;
+		ConnectionString = connectionStringBuilder.ToString();
 
-        public string DatabaseName { get; }
+		_settings = new MsSqlStreamStoreSettings(ConnectionString, loggerFactory) {
+			Schema = schema,
+			GetUtcNow = () => GetUtcNow(),
+		};
+	}
 
-        public IStreamStore Store => MsSqlStreamStore;
+	public string DatabaseName { get; }
 
-        public MsSqlStreamStore MsSqlStreamStore { get; private set; }
+	public IStreamStore Store => MsSqlStreamStore;
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public MsSqlStreamStore MsSqlStreamStore { get; private set; } = null!;
 
-        public long MinPosition { get; set; } = 0;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public int MaxSubscriptionCount { get; set; } = 500;
+	public long MinPosition { get; set; } = 0;
 
-        public string ConnectionString { get; }
+	public int MaxSubscriptionCount { get; set; } = 500;
 
-        public bool DisableDeletionTracking
-        {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
+	public string ConnectionString { get; }
 
-        public async Task Prepare()
-        {
-            MsSqlStreamStore = new MsSqlStreamStore(_settings);
+	public bool DisableDeletionTracking {
+		get => throw new NotSupportedException();
+		set => throw new NotSupportedException();
+	}
 
-            await MsSqlStreamStore.DropAll();
-            await MsSqlStreamStore.CreateSchema();
-        }
+	public async Task Prepare() {
+		MsSqlStreamStore = new MsSqlStreamStore(_settings);
 
-        public void Dispose()
-        {
-            Store.Dispose();
-            MsSqlStreamStore = null;
-            _onDispose();
-        }
-    }
+		await MsSqlStreamStore.DropAll();
+		await MsSqlStreamStore.CreateSchema();
+	}
+
+	public void Dispose() {
+		Store.Dispose();
+		MsSqlStreamStore = null!;
+		_onDispose();
+	}
 }

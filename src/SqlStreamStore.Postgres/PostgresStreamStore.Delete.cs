@@ -1,111 +1,110 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Npgsql;
-    using SqlStreamStore.PgSqlScripts;
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore;
 
-    public partial class PostgresStreamStore
-    {
-        protected override async Task DeleteStreamInternal(
-            string streamId,
-            int expectedVersion,
-            CancellationToken cancellationToken)
-        {
-            var streamIdInfo = new StreamIdInfo(streamId);
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Npgsql;
+using SqlStreamStore.PgSqlScripts;
+using SqlStreamStore.Streams;
 
-            using(var connection = await OpenConnection(cancellationToken))
-            using(var transaction = connection.BeginTransaction())
-            {
-                await DeleteStreamInternal(
-                    streamIdInfo.PostgresqlStreamId,
-                    expectedVersion,
-                    transaction,
-                    cancellationToken);
+public partial class PostgresStreamStore {
+	protected override async Task DeleteStreamInternal(
+		string streamId,
+		int expectedVersion,
+		CancellationToken cancellationToken) {
+		var streamIdInfo = new StreamIdInfo(streamId);
 
-                await DeleteStreamInternal(
-                    streamIdInfo.MetadataPosgresqlStreamId,
-                    ExpectedVersion.Any,
-                    transaction,
-                    cancellationToken);
+		using (var connection = await OpenConnection(cancellationToken))
+		using (var transaction = connection.BeginTransaction()) {
+			await DeleteStreamInternal(
+				streamIdInfo.PostgresqlStreamId,
+				expectedVersion,
+				transaction,
+				cancellationToken);
 
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
+			await DeleteStreamInternal(
+				streamIdInfo.MetadataPosgresqlStreamId,
+				ExpectedVersion.Any,
+				transaction,
+				cancellationToken);
 
-        private async Task DeleteStreamInternal(
-            PostgresqlStreamId streamId,
-            int expectedVersion,
-            NpgsqlTransaction transaction,
-            CancellationToken cancellationToken)
-        {
-            using(var command = BuildFunctionCommand(
-                _schema.DeleteStream,
-                transaction,
-                Parameters.StreamId(streamId),
-                Parameters.ExpectedVersion(expectedVersion),
-                Parameters.CreatedUtc(_settings.GetUtcNow?.Invoke()),
-                Parameters.DeletionTrackingDisabled(_settings.DisableDeletionTracking),
-                _settings.DisableDeletionTracking ? Parameters.Empty() : Parameters.DeletedStreamId,
-                _settings.DisableDeletionTracking ? Parameters.Empty() : Parameters.DeletedStreamIdOriginal,
-                _settings.DisableDeletionTracking ? Parameters.Empty() : Parameters.DeletedStreamMessage(streamId)))
-            {
-                try
-                {
-                    await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                }
-                catch(PostgresException ex) when(ex.IsWrongExpectedVersion())
-                {
-                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+			await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+		}
+	}
 
-                    throw new WrongExpectedVersionException(
-                        ErrorMessages.DeleteStreamFailedWrongExpectedVersion(streamId.IdOriginal, expectedVersion),
-                        streamId.IdOriginal,
-                        expectedVersion,
-                        ex);
-                }
-            }
-        }
+	private async Task DeleteStreamInternal(
+		PostgresqlStreamId streamId,
+		int expectedVersion,
+		NpgsqlTransaction transaction,
+		CancellationToken cancellationToken) {
+		using (var command = BuildFunctionCommand(
+			       _schema.DeleteStream,
+			       transaction,
+			       true,
+			       Parameters.StreamId(streamId),
+			       Parameters.ExpectedVersion(expectedVersion),
+			       Parameters.CreatedUtc(_settings.GetUtcNow?.Invoke()),
+			       Parameters.DeletionTrackingDisabled(_settings.DisableDeletionTracking),
+			       _settings.DisableDeletionTracking
+				       ? Parameters.Empty(Parameters.DeletedStreamId)
+				       : Parameters.DeletedStreamId,
+			       _settings.DisableDeletionTracking
+				       ? Parameters.Empty(Parameters.DeletedStreamIdOriginal)
+				       : Parameters.DeletedStreamIdOriginal,
+			       _settings.DisableDeletionTracking
+				       ? Parameters.Empty(Parameters.DeletedStreamMessage(new PostgresqlStreamId()))
+				       : Parameters.DeletedStreamMessage(streamId))) {
+			try {
+				await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+			} catch (PostgresException ex) when (ex.IsWrongExpectedVersion()) {
+				await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
-        protected override async Task DeleteEventInternal(
-            string streamId,
-            Guid eventId,
-            CancellationToken cancellationToken)
-        {
-            var streamIdInfo = new StreamIdInfo(streamId);
+				throw new WrongExpectedVersionException(
+					ErrorMessages.DeleteStreamFailedWrongExpectedVersion(streamId.IdOriginal, expectedVersion),
+					streamId.IdOriginal,
+					expectedVersion,
+					ex);
+			}
+		}
+	}
 
-            using(var connection = await OpenConnection(cancellationToken))
-            using(var transaction = connection.BeginTransaction())
-            {
-                await DeleteEventsInternal(streamIdInfo, new[] { eventId }, transaction, cancellationToken);
+	protected override async Task DeleteEventInternal(
+		string streamId,
+		Guid eventId,
+		CancellationToken cancellationToken) {
+		var streamIdInfo = new StreamIdInfo(streamId);
 
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
+		using (var connection = await OpenConnection(cancellationToken))
+		using (var transaction = connection.BeginTransaction()) {
+			await DeleteEventsInternal(streamIdInfo, new[] { eventId }, transaction, cancellationToken);
 
-        private async Task DeleteEventsInternal(
-            StreamIdInfo streamIdInfo,
-            Guid[] eventIds,
-            NpgsqlTransaction transaction,
-            CancellationToken cancellationToken)
-        {
-            using(var command = BuildFunctionCommand(
-                _schema.DeleteStreamMessages,
-                transaction,
-                Parameters.StreamId(streamIdInfo.PostgresqlStreamId),
-                Parameters.MessageIds(eventIds),
-                Parameters.DeletionTrackingDisabled(_settings.DisableDeletionTracking),
-                _settings.DisableDeletionTracking ? Parameters.Empty() : Parameters.DeletedStreamId,
-                _settings.DisableDeletionTracking ? Parameters.Empty() : Parameters.DeletedStreamIdOriginal,
-                Parameters.CreatedUtc(_settings.GetUtcNow?.Invoke()),
-                _settings.DisableDeletionTracking
-                    ? Parameters.Empty()
-                    : Parameters.DeletedMessages(streamIdInfo.PostgresqlStreamId, eventIds)))
-            {
-                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-    }
+			await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	private async Task DeleteEventsInternal(
+		StreamIdInfo streamIdInfo,
+		Guid[] eventIds,
+		NpgsqlTransaction transaction,
+		CancellationToken cancellationToken) {
+		using (var command = BuildFunctionCommand(
+			       _schema.DeleteStreamMessages,
+			       transaction,
+			       true,
+			       Parameters.StreamId(streamIdInfo.PostgresqlStreamId),
+			       Parameters.MessageIds(eventIds),
+			       Parameters.DeletionTrackingDisabled(_settings.DisableDeletionTracking),
+			       _settings.DisableDeletionTracking
+				       ? Parameters.Empty(Parameters.DeletedStreamId)
+				       : Parameters.DeletedStreamId,
+			       _settings.DisableDeletionTracking
+				       ? Parameters.Empty(Parameters.DeletedStreamIdOriginal)
+				       : Parameters.DeletedStreamIdOriginal,
+			       Parameters.CreatedUtc(_settings.GetUtcNow?.Invoke()),
+			       _settings.DisableDeletionTracking
+				       ? Parameters.Empty(Parameters.DeletedMessages(new()))
+				       : Parameters.DeletedMessages(streamIdInfo.PostgresqlStreamId, eventIds))) {
+			await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+		}
+	}
 }

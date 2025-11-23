@@ -1,39 +1,29 @@
-namespace SqlStreamStore.Streams
-{
-    using System;
+namespace SqlStreamStore.Streams;
 
-    public abstract class Pattern
-    {
-        public static Pattern StartsWith(string pattern) => new StartingWith(pattern);
-        public static Pattern EndsWith(string pattern) => new EndingWith(pattern);
-        public static Pattern Anything() => new Any();
+using System;
 
-        public static ArgumentException Unrecognized(string paramName)
-            => new ArgumentException("Unrecognized pattern.", paramName);
+public abstract class Pattern {
+	public static Pattern StartsWith(string? pattern) => new StartingWith(pattern);
+	public static Pattern EndsWith(string? pattern) => new EndingWith(pattern);
+	public static Pattern Anything() => new Any();
 
-        public string Value { get; }
+	public static ArgumentException Unrecognized(string paramName) => new("Unrecognized pattern.", paramName);
 
-        protected Pattern(string value)
-        {
-            Value = value;
-        }
+	public string Value { get; }
 
-        public class StartingWith : Pattern
-        {
-            protected internal StartingWith(string value) : base(value)
-            { }
-        }
+	protected Pattern(string? value) {
+		Value = value ?? "";
+	}
 
-        public class EndingWith : Pattern
-        {
-            protected internal EndingWith(string value) : base(value)
-            { }
-        }
+	public class StartingWith : Pattern {
+		protected internal StartingWith(string? value) : base(value) { }
+	}
 
-        public class Any : Pattern
-        {
-            protected internal Any() : base(null)
-            { }
-        }
-    }
+	public class EndingWith : Pattern {
+		protected internal EndingWith(string? value) : base(value) { }
+	}
+
+	public class Any : Pattern {
+		protected internal Any() : base(null) { }
+	}
 }

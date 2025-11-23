@@ -1,32 +1,28 @@
-namespace SqlStreamStore.InMemory
-{
-    using System;
-    using SqlStreamStore.Infrastructure;
+namespace SqlStreamStore.InMemory;
 
-    public class InMemoryStreamStoreFixture : IStreamStoreFixture
-    {
-        public InMemoryStreamStoreFixture()
-        {
-            Store = new InMemoryStreamStore(() => GetUtcNow());  
-        }
+using System;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.Infrastructure;
 
-        public void Dispose()
-        {
-            Store.Dispose();
-        }
+public class InMemoryStreamStoreFixture : IStreamStoreFixture {
+	public InMemoryStreamStoreFixture(ILoggerFactory loggerFactory) {
+		Store = new InMemoryStreamStore(() => GetUtcNow(), loggerFactory.CreateLogger<InMemoryStreamStore>());
+	}
 
-        public IStreamStore Store { get; }
+	public void Dispose() {
+		Store.Dispose();
+	}
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public IStreamStore Store { get; }
 
-        public long MinPosition { get; set; } = 0;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public int MaxSubscriptionCount { get; set; } = 500;
+	public long MinPosition { get; set; } = 0;
 
-        public bool DisableDeletionTracking
-        {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
-    }
+	public int MaxSubscriptionCount { get; set; } = 500;
+
+	public bool DisableDeletionTracking {
+		get => throw new NotSupportedException();
+		set => throw new NotSupportedException();
+	}
 }

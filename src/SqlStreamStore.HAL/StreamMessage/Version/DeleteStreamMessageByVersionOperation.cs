@@ -1,40 +1,36 @@
-namespace SqlStreamStore.HAL.StreamMessage.Version
-{
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.AspNetCore.Routing;
+namespace SqlStreamStore.HAL.StreamMessage.Version;
 
-    internal class DeleteStreamMessageByVersionOperation : IStreamStoreOperation<Unit>
-    {
-        public DeleteStreamMessageByVersionOperation(HttpContext context)
-        {
-            Path = context.Request.Path;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
-            StreamId = context.GetRouteData().GetStreamId();
-            StreamVersion = context.GetRouteData().GetStreamVersion();
-        }
+internal class DeleteStreamMessageByVersionOperation : IStreamStoreOperation<Unit> {
+	public DeleteStreamMessageByVersionOperation(HttpContext context) {
+		Path = context.Request.Path;
 
-        public string StreamId { get; }
-        public int StreamVersion { get; }
-        public PathString Path { get; }
+		StreamId = context.GetRouteData().GetStreamId();
+		StreamVersion = context.GetRouteData().GetStreamVersion();
+	}
 
-        public async Task<Unit> Invoke(IStreamStore streamStore, CancellationToken ct)
-        {
-            var messageId = (await streamStore.ReadStreamBackwards(
-                                StreamId,
-                                StreamVersion,
-                                1,
-                                true,
-                                ct))
-                            .Messages.FirstOrDefault(
-                                message => StreamVersion == SqlStreamStore.Streams.StreamVersion.End
-                                           || message.StreamVersion == StreamVersion)
-                            .MessageId;
-            await streamStore.DeleteMessage(StreamId, messageId, ct);
+	public string StreamId { get; }
+	public int StreamVersion { get; }
+	public PathString Path { get; }
 
-            return Unit.Instance;
-        }
-    }
+	public async Task<Unit> Invoke(IStreamStore streamStore, CancellationToken ct) {
+		var messageId = (await streamStore.ReadStreamBackwards(
+				StreamId,
+				StreamVersion,
+				1,
+				true,
+				ct))
+			.Messages.FirstOrDefault(
+				message => StreamVersion == SqlStreamStore.Streams.StreamVersion.End
+				           || message.StreamVersion == StreamVersion)
+			.MessageId;
+		await streamStore.DeleteMessage(StreamId, messageId, ct);
+
+		return Unit.Instance;
+	}
 }

@@ -1,16 +1,14 @@
-namespace SqlStreamStore.Internal.HoneyBearHalClient
-{
-    using System.Collections.Generic;
-    using System.Net;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Http;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+namespace SqlStreamStore.Internal.HoneyBearHalClient;
 
-    internal interface IHalClient
-    {
-        IEnumerable<IResource> Current { get; }
+using System.Collections.Generic;
+using System.Net;
+using SqlStreamStore.Internal.HoneyBearHalClient.Http;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-        IJsonHttpClient Client { get; }
+internal interface IHalClient {
+	IEnumerable<IResource> Current { get; }
 
-        HttpStatusCode? StatusCode { get; }
-    }
+	IJsonHttpClient Client { get; }
+
+	HttpStatusCode? StatusCode { get; }
 }

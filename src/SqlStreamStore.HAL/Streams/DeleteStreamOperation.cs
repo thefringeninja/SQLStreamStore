@@ -1,28 +1,24 @@
-namespace SqlStreamStore.HAL.Streams
-{
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.AspNetCore.Routing;
+namespace SqlStreamStore.HAL.Streams;
 
-    internal class DeleteStreamOperation : IStreamStoreOperation<Unit>
-    {
-        public DeleteStreamOperation(HttpContext context)
-        {
-            Path = context.Request.Path;
-            StreamId = context.GetRouteData().GetStreamId();
-            ExpectedVersion = context.Request.GetExpectedVersion();
-        }
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
-        public string StreamId { get; }
-        public int ExpectedVersion { get; }
-        public PathString Path { get; }
+internal class DeleteStreamOperation : IStreamStoreOperation<Unit> {
+	public DeleteStreamOperation(HttpContext context) {
+		Path = context.Request.Path;
+		StreamId = context.GetRouteData().GetStreamId();
+		ExpectedVersion = context.Request.GetExpectedVersion();
+	}
 
-        public async Task<Unit> Invoke(IStreamStore streamStore, CancellationToken ct)
-        {
-            await streamStore.DeleteStream(StreamId, ExpectedVersion, ct);
+	public string StreamId { get; }
+	public int ExpectedVersion { get; }
+	public PathString Path { get; }
 
-            return Unit.Instance;
-        }
-    }
+	public async Task<Unit> Invoke(IStreamStore streamStore, CancellationToken ct) {
+		await streamStore.DeleteStream(StreamId, ExpectedVersion, ct);
+
+		return Unit.Instance;
+	}
 }

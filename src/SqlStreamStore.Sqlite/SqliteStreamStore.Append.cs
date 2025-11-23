@@ -1,373 +1,328 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    public partial class SqliteStreamStore
-    {
-        protected override async Task<AppendResult> AppendToStreamInternal(
-            string streamId,
-            int expectedVersion,
-            NewStreamMessage[] messages,
-            CancellationToken cancellationToken)
-        {
-            GuardAgainstDisposed();
-            cancellationToken.ThrowIfCancellationRequested();
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Streams;
 
-            SqliteAppendResult result;
+public partial class SqliteStreamStore {
+	protected override async Task<AppendResult> AppendToStreamInternal(
+		string streamId,
+		int expectedVersion,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		GuardAgainstDisposed();
+		cancellationToken.ThrowIfCancellationRequested();
 
-            switch(expectedVersion)
-            {
-                case ExpectedVersion.Any:
-                    result = await AppendToStreamAnyVersion(streamId, messages, cancellationToken).ConfigureAwait(false);
-                    break;
-                case ExpectedVersion.EmptyStream:
-                    result = await AppendToStreamEmpty(streamId, messages, cancellationToken).ConfigureAwait(false);
-                    break;
-                case ExpectedVersion.NoStream:
-                    result = await AppendToNonexistentStream(streamId, messages, cancellationToken).ConfigureAwait(false);
-                    break;
-                default:
-                    result = AppendToStreamExpectedVersion(streamId, expectedVersion, messages, cancellationToken);
-                    break;
-            }
+		SqliteAppendResult result;
 
-            if(result.MaxCount.HasValue)
-            {
-                await CheckStreamMaxCount(streamId, result.MaxCount, cancellationToken).ConfigureAwait(false);
-            }
+		switch (expectedVersion) {
+			case ExpectedVersion.Any:
+				result = await AppendToStreamAnyVersion(streamId, messages, cancellationToken).ConfigureAwait(false);
+				break;
+			case ExpectedVersion.EmptyStream:
+				result = await AppendToStreamEmpty(streamId, messages, cancellationToken).ConfigureAwait(false);
+				break;
+			case ExpectedVersion.NoStream:
+				result = await AppendToNonexistentStream(streamId, messages, cancellationToken).ConfigureAwait(false);
+				break;
+			default:
+				result = AppendToStreamExpectedVersion(streamId, expectedVersion, messages, cancellationToken);
+				break;
+		}
 
-            await TryScavengeAsync(streamId, cancellationToken);
+		if (result.MaxCount.HasValue) {
+			await CheckStreamMaxCount(streamId, result.MaxCount, cancellationToken).ConfigureAwait(false);
+		}
 
-            return result;
-        }
+		await TryScavengeAsync(streamId, cancellationToken);
 
-        private Task<SqliteAppendResult> AppendToStreamAnyVersion(
-            string streamId,
-            NewStreamMessage[] messages,
-            CancellationToken cancellationToken)
-        {
-            using(var connection = OpenConnection(false))
-            {
-                var stream = connection.Streams(streamId);
-                var allStream = connection.AllStream();
+		return result;
+	}
 
-                var props = stream.Properties(true, cancellationToken)
-                    .GetAwaiter().GetResult();
+	private Task<SqliteAppendResult> AppendToStreamAnyVersion(
+		string streamId,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		using (var connection = OpenConnection(false)) {
+			var stream = connection.Streams(streamId);
+			var allStream = connection.AllStream();
 
-                if(messages.Length == 1)
-                {
-                    var msg = messages[0];
+			var props = stream.Properties(true, cancellationToken)
+				.GetAwaiter().GetResult();
 
-                    var exists = stream.Contains(msg.MessageId)
-                        .GetAwaiter().GetResult();
+			if (messages.Length == 1) {
+				var msg = messages[0];
 
-                    if(exists)
-                    {
-                        return Task.FromResult(new SqliteAppendResult(props.Version, props.Position, null));
-                    }
-                }
-                else if(messages.Any())
-                {
-                    var msg1 = messages.First();
-                    var position = stream.AllStreamPosition(ReadDirection.Forward, msg1.MessageId)
-                        .GetAwaiter().GetResult() ?? long.MaxValue;
+				var exists = stream.Contains(msg.MessageId)
+					.GetAwaiter().GetResult();
 
-                    var sMessages = stream.Read(ReadDirection.Forward, position, false, messages.Length)
-                        .GetAwaiter()
-                        .GetResult();
-                    var eventIds = sMessages.Select(m => m.MessageId).ToArray();
+				if (exists) {
+					return Task.FromResult(new SqliteAppendResult(props.Version, props.Position, null));
+				}
+			} else if (messages.Any()) {
+				var msg1 = messages.First();
+				var position = stream.AllStreamPosition(ReadDirection.Forward, msg1.MessageId)
+					.GetAwaiter().GetResult() ?? long.MaxValue;
 
-                    if(eventIds.Length > 0)
-                    {
-                        for(var i = 0; i < Math.Min(eventIds.Length, messages.Length); i++)
-                        {
-                            if(eventIds[i] != messages[i].MessageId)
-                            {
-                                throw new WrongExpectedVersionException(
-                                    ErrorMessages.AppendFailedWrongExpectedVersion(
-                                        streamId,
-                                        StreamVersion.Start),
-                                    streamId,
-                                    StreamVersion.Start);
-                            }
-                        }
+				var sMessages = stream.Read(ReadDirection.Forward, position, false, messages.Length)
+					.GetAwaiter()
+					.GetResult();
+				var eventIds = sMessages.Select(m => m.MessageId).ToArray();
 
-                        if(eventIds.Length < messages.Length && eventIds.Length > 0)
-                        {
-                            throw new WrongExpectedVersionException(
-                                ErrorMessages.AppendFailedWrongExpectedVersion(
-                                    streamId,
-                                    StreamVersion.Start),
-                                streamId,
-                                StreamVersion.Start);
-                        }
+				if (eventIds.Length > 0) {
+					for (var i = 0; i < Math.Min(eventIds.Length, messages.Length); i++) {
+						if (eventIds[i] != messages[i].MessageId) {
+							throw new WrongExpectedVersionException(
+								ErrorMessages.AppendFailedWrongExpectedVersion(
+									streamId,
+									StreamVersion.Start),
+								streamId,
+								StreamVersion.Start);
+						}
+					}
 
-                        return Task.FromResult(new SqliteAppendResult(props.Version, props.Position, null));
-                    }
-                }
+					if (eventIds.Length < messages.Length && eventIds.Length > 0) {
+						throw new WrongExpectedVersionException(
+							ErrorMessages.AppendFailedWrongExpectedVersion(
+								streamId,
+								StreamVersion.Start),
+							streamId,
+							StreamVersion.Start);
+					}
 
-                using(allStream.WithTransaction())
-                {
-                    var result = allStream.Append(streamId, messages)
-                        .GetAwaiter().GetResult();
+					return Task.FromResult(new SqliteAppendResult(props.Version, props.Position, null));
+				}
+			}
 
-                    allStream.Commit(cancellationToken)
-                        .GetAwaiter().GetResult();
+			using (allStream.WithTransaction()) {
+				var result = allStream.Append(streamId, messages)
+					.GetAwaiter().GetResult();
 
-                    return Task.FromResult(result);
-                }
-            }
-        }
+				allStream.Commit(cancellationToken)
+					.GetAwaiter().GetResult();
 
-        private async Task<SqliteAppendResult> AppendToStreamEmpty(string streamId, NewStreamMessage[] messages, CancellationToken cancellationToken)
-        {
-            using(var conn = OpenConnection(false))
-            {
-                var stream = conn.Streams(streamId);
-                var allStream = conn.AllStream();
+				return Task.FromResult(result);
+			}
+		}
+	}
 
-                var length = await stream.Length(cancellationToken);
+	private async Task<SqliteAppendResult> AppendToStreamEmpty(string streamId, NewStreamMessage[] messages, CancellationToken cancellationToken) {
+		using (var conn = OpenConnection(false)) {
+			var stream = conn.Streams(streamId);
+			var allStream = conn.AllStream();
 
-                if(length > StreamVersion.Start)
-                {
-                    throw new WrongExpectedVersionException(
-                        ErrorMessages.AppendFailedWrongExpectedVersion(
-                            streamId,
-                            StreamVersion.Start),
-                        streamId,
-                        StreamVersion.Start);
-                }
+			var length = await stream.Length(cancellationToken);
 
-                using(allStream.WithTransaction())
-                {
-                    var result = await allStream.Append(streamId, messages);
-                    await allStream.Commit(cancellationToken);
-                    return result;
-                }
-            }
-        }
+			if (length > StreamVersion.Start) {
+				throw new WrongExpectedVersionException(
+					ErrorMessages.AppendFailedWrongExpectedVersion(
+						streamId,
+						StreamVersion.Start),
+					streamId,
+					StreamVersion.Start);
+			}
 
-        private async Task<SqliteAppendResult> AppendToNonexistentStream(string streamId, NewStreamMessage[] messages, CancellationToken cancellationToken)
-        {
-            using(var connection = OpenConnection(false))
-            {
-                var stream = connection.Streams(streamId);
+			using (allStream.WithTransaction()) {
+				var result = await allStream.Append(streamId, messages);
+				await allStream.Commit(cancellationToken);
+				return result;
+			}
+		}
+	}
 
-                if(await stream.Exists())
-                {
-                    var position = await stream.AllStreamPosition(ReadDirection.Forward, StreamVersion.Start);
-                    var eventIds = (await stream.Read(ReadDirection.Forward, position, false, int.MaxValue - 1))
-                        .Select(message => message.MessageId)
-                        .ToArray();
+	private async Task<SqliteAppendResult> AppendToNonexistentStream(string streamId, NewStreamMessage[] messages, CancellationToken cancellationToken) {
+		using (var connection = OpenConnection(false)) {
+			var stream = connection.Streams(streamId);
 
-                    if(eventIds.Length > 0)
-                    {
-                        for(var i = 0; i < Math.Min(eventIds.Length, messages.Length); i++)
-                        {
-                            if(eventIds[i] != messages[i].MessageId)
-                            {
-                                throw new WrongExpectedVersionException(
-                                    ErrorMessages.AppendFailedWrongExpectedVersion(
-                                        streamId,
-                                        ExpectedVersion.NoStream),
-                                    streamId,
-                                    ExpectedVersion.NoStream);
-                            }
-                        }
+			if (await stream.Exists()) {
+				var position = await stream.AllStreamPosition(ReadDirection.Forward, StreamVersion.Start);
+				var eventIds = (await stream.Read(ReadDirection.Forward, position, false, int.MaxValue - 1))
+					.Select(message => message.MessageId)
+					.ToArray();
 
-                        if(eventIds.Length < messages.Length)
-                        {
-                            throw new WrongExpectedVersionException(
-                                ErrorMessages.AppendFailedWrongExpectedVersion(
-                                    streamId,
-                                    ExpectedVersion.NoStream),
-                                streamId,
-                                ExpectedVersion.NoStream);
-                        }
+				if (eventIds.Length > 0) {
+					for (var i = 0; i < Math.Min(eventIds.Length, messages.Length); i++) {
+						if (eventIds[i] != messages[i].MessageId) {
+							throw new WrongExpectedVersionException(
+								ErrorMessages.AppendFailedWrongExpectedVersion(
+									streamId,
+									ExpectedVersion.NoStream),
+								streamId,
+								ExpectedVersion.NoStream);
+						}
+					}
 
-                        var header = stream.Properties(false, cancellationToken)
-                            .GetAwaiter().GetResult();
+					if (eventIds.Length < messages.Length) {
+						throw new WrongExpectedVersionException(
+							ErrorMessages.AppendFailedWrongExpectedVersion(
+								streamId,
+								ExpectedVersion.NoStream),
+							streamId,
+							ExpectedVersion.NoStream);
+					}
 
-                        return new SqliteAppendResult(header.Version, header.Position, null);
-                    }
-                }
+					var header = stream.Properties(false, cancellationToken)
+						.GetAwaiter().GetResult();
 
-                using(stream.WithTransaction())
-                {
-                    // this will create the stream information so messages can be appended.
-                    stream.Properties(true, cancellationToken)
-                        .GetAwaiter().GetResult();
+					return new SqliteAppendResult(header.Version, header.Position, null);
+				}
+			}
 
-                    await stream.Commit(cancellationToken);
-                }
-            }
+			using (stream.WithTransaction()) {
+				// this will create the stream information so messages can be appended.
+				stream.Properties(true, cancellationToken)
+					.GetAwaiter().GetResult();
 
-            return await AppendToStreamEmpty(streamId, messages, cancellationToken);
-        }
+				await stream.Commit(cancellationToken);
+			}
+		}
 
-        private SqliteAppendResult AppendToStreamExpectedVersion(string streamId, int expectedVersion, NewStreamMessage[] messages, CancellationToken cancellationToken)
-        {
-            using(var connection = OpenConnection(false))
-            {
-                var stream = connection.Streams(streamId);
+		return await AppendToStreamEmpty(streamId, messages, cancellationToken);
+	}
 
-                if(!stream.Exists().GetAwaiter().GetResult())
-                {
-                    throw new WrongExpectedVersionException(
-                        ErrorMessages.AppendFailedWrongExpectedVersion(
-                            streamId,
-                            expectedVersion),
-                        streamId,
-                        expectedVersion);
-                }
+	private SqliteAppendResult AppendToStreamExpectedVersion(string streamId, int expectedVersion, NewStreamMessage[] messages, CancellationToken cancellationToken) {
+		using (var connection = OpenConnection(false)) {
+			var stream = connection.Streams(streamId);
 
-                var props = connection.Streams(streamId)
-                    .Properties(initializeIfNotFound: false, cancellationToken)
-                    .GetAwaiter().GetResult();
+			if (!stream.Exists().GetAwaiter().GetResult()) {
+				throw new WrongExpectedVersionException(
+					ErrorMessages.AppendFailedWrongExpectedVersion(
+						streamId,
+						expectedVersion),
+					streamId,
+					expectedVersion);
+			}
 
-                if(messages.Length == 1)
-                {
-                    var msg = messages.First();
+			var props = connection.Streams(streamId)
+				.Properties(initializeIfNotFound: false, cancellationToken)
+				.GetAwaiter().GetResult();
 
-                    // tries to fix "When_append_single_message_to_stream_with_correct_expected_version_second_time_with_same_initial_messages_then_should_have_expected_result"
-                    if(stream.ExistsAtExpectedPosition(msg.MessageId, expectedVersion).GetAwaiter().GetResult())
-                    {
-                        return new SqliteAppendResult(
-                            props.Version,
-                            props.Position,
-                            null
-                        );
-                    }
-                    // end - tries to fix "When_append_single_message_to_stream_with_correct_expected_version_second_time_with_same_initial_messages_then_should_have_expected_result"
+			if (messages.Length == 1) {
+				var msg = messages.First();
+
+				// tries to fix "When_append_single_message_to_stream_with_correct_expected_version_second_time_with_same_initial_messages_then_should_have_expected_result"
+				if (stream.ExistsAtExpectedPosition(msg.MessageId, expectedVersion).GetAwaiter().GetResult()) {
+					return new SqliteAppendResult(
+						props.Version,
+						props.Position,
+						null
+					);
+				}
+				// end - tries to fix "When_append_single_message_to_stream_with_correct_expected_version_second_time_with_same_initial_messages_then_should_have_expected_result"
 
 
-                    // tries to fix "When_append_stream_with_expected_version_and_duplicate_message_Id_then_should_throw"
-                    if(stream.Exists(msg.MessageId, expectedVersion).GetAwaiter().GetResult())
-                    {
-                        throw new WrongExpectedVersionException(
-                            ErrorMessages.AppendFailedWrongExpectedVersion(
-                                streamId,
-                                expectedVersion),
-                            streamId,
-                            expectedVersion);
-                    }
-                    // end - tries to fix "When_append_stream_with_expected_version_and_duplicate_message_Id_then_should_throw"
+				// tries to fix "When_append_stream_with_expected_version_and_duplicate_message_Id_then_should_throw"
+				if (stream.Exists(msg.MessageId, expectedVersion).GetAwaiter().GetResult()) {
+					throw new WrongExpectedVersionException(
+						ErrorMessages.AppendFailedWrongExpectedVersion(
+							streamId,
+							expectedVersion),
+						streamId,
+						expectedVersion);
+				}
+				// end - tries to fix "When_append_stream_with_expected_version_and_duplicate_message_Id_then_should_throw"
 
-                    var eventIds = stream.Read(ReadDirection.Forward, expectedVersion, false, int.MaxValue)
-                        .GetAwaiter().GetResult()
-                        .Select(message => message.MessageId)
-                        .ToArray();
+				var eventIds = stream.Read(ReadDirection.Forward, expectedVersion, false, int.MaxValue)
+					.GetAwaiter().GetResult()
+					.Select(message => message.MessageId)
+					.ToArray();
 
-                    if(eventIds.Contains(msg.MessageId))
-                    {
-                        if(eventIds.Length > messages.Length)
-                        {
-                            throw new WrongExpectedVersionException(
-                                ErrorMessages.AppendFailedWrongExpectedVersion(
-                                    streamId,
-                                    ExpectedVersion.NoStream),
-                                streamId,
-                                ExpectedVersion.NoStream);
-                        }
-                        return new SqliteAppendResult(
-                            props.Version,
-                            props.Position,
-                            null
-                        );
-                    }
-                }
+				if (eventIds.Contains(msg.MessageId)) {
+					if (eventIds.Length > messages.Length) {
+						throw new WrongExpectedVersionException(
+							ErrorMessages.AppendFailedWrongExpectedVersion(
+								streamId,
+								ExpectedVersion.NoStream),
+							streamId,
+							ExpectedVersion.NoStream);
+					}
+					return new SqliteAppendResult(
+						props.Version,
+						props.Position,
+						null
+					);
+				}
+			}
 
-                if(expectedVersion != props.Version)
-                {
-                    var msg = messages.First();
+			if (expectedVersion != props.Version) {
+				var msg = messages.First();
 
-                    var position = stream.AllStreamPosition(ReadDirection.Forward, msg.MessageId)
-                        .GetAwaiter().GetResult();
+				var position = stream.AllStreamPosition(ReadDirection.Forward, msg.MessageId)
+					.GetAwaiter().GetResult();
 
-                    // retrieve next series of messages from the first message being requested to
-                    var eventIds = position.HasValue
-                        ? stream.Read(ReadDirection.Forward, position, false, messages.Length)
-                        .GetAwaiter().GetResult()
-                        .Select(message => message.MessageId)
-                        .ToArray()
-                        : new Guid[0];
+				// retrieve next series of messages from the first message being requested to
+				var eventIds = position.HasValue
+					? stream.Read(ReadDirection.Forward, position, false, messages.Length)
+						.GetAwaiter().GetResult()
+						.Select(message => message.MessageId)
+						.ToArray()
+					: new Guid[0];
 
-                    if(messages.Length != eventIds.Length)
-                    {
-                        throw new WrongExpectedVersionException(
-                            ErrorMessages.AppendFailedWrongExpectedVersion(
-                                streamId,
-                                expectedVersion),
-                            streamId,
-                            expectedVersion);
-                    }
+				if (messages.Length != eventIds.Length) {
+					throw new WrongExpectedVersionException(
+						ErrorMessages.AppendFailedWrongExpectedVersion(
+							streamId,
+							expectedVersion),
+						streamId,
+						expectedVersion);
+				}
 
-                    // tests for positional inequality between what we know and what is stored.
-                    for(var i = 0; i < Math.Min(messages.Length, eventIds.Length); i++)
-                    {
-                        var nextMessageId = eventIds.Skip(i).Take(1).SingleOrDefault();
-                        if(messages[i].MessageId != nextMessageId)
-                        {
-                            throw new WrongExpectedVersionException(
-                                ErrorMessages.AppendFailedWrongExpectedVersion(
-                                    streamId,
-                                    expectedVersion),
-                                streamId,
-                                expectedVersion);
-                        }
-                    }
+				// tests for positional inequality between what we know and what is stored.
+				for (var i = 0; i < Math.Min(messages.Length, eventIds.Length); i++) {
+					var nextMessageId = eventIds.Skip(i).Take(1).SingleOrDefault();
+					if (messages[i].MessageId != nextMessageId) {
+						throw new WrongExpectedVersionException(
+							ErrorMessages.AppendFailedWrongExpectedVersion(
+								streamId,
+								expectedVersion),
+							streamId,
+							expectedVersion);
+					}
+				}
 
-                    // we seem to be equal.
-                    return new SqliteAppendResult(
-                        props.Version,
-                        props.Position,
-                        props.MaxCount
-                    );
-                }
+				// we seem to be equal.
+				return new SqliteAppendResult(
+					props.Version,
+					props.Position,
+					props.MaxCount
+				);
+			}
 
-                var allStream = connection.AllStream();
+			var allStream = connection.AllStream();
 
-                using(allStream.WithTransaction())
-                {
-                    var result = allStream.Append(streamId, messages)
-                        .GetAwaiter().GetResult();
+			using (allStream.WithTransaction()) {
+				var result = allStream.Append(streamId, messages)
+					.GetAwaiter().GetResult();
 
-                    allStream.Commit(cancellationToken)
-                        .GetAwaiter().GetResult();
+				allStream.Commit(cancellationToken)
+					.GetAwaiter().GetResult();
 
-                    return result;
-                }
-            }
-        }
+				return result;
+			}
+		}
+	}
 
-        private async Task CheckStreamMaxCount(
-            string streamId,
-            int? maxCount,
-            CancellationToken cancellationToken)
-        {
-            var count = await OpenConnection()
-                .Streams(streamId)
-                .Length(cancellationToken);
+	private async Task CheckStreamMaxCount(
+		string streamId,
+		int? maxCount,
+		CancellationToken cancellationToken) {
+		var count = await OpenConnection()
+			.Streams(streamId)
+			.Length(cancellationToken);
 
-            if (count > maxCount)
-            {
-                int toPurge = count - maxCount.Value;
+		if (count > maxCount) {
+			int toPurge = count - maxCount.Value;
 
-                var streamMessagesPage = await ReadStreamForwardsInternal(streamId, StreamVersion.Start, toPurge, false, null, cancellationToken)
-                    .ConfigureAwait(false);
+			var streamMessagesPage = await ReadStreamForwardsInternal(streamId, StreamVersion.Start, toPurge, false, null, cancellationToken)
+				.ConfigureAwait(false);
 
-                if (streamMessagesPage.Status == PageReadStatus.Success)
-                {
-                    foreach (var message in streamMessagesPage.Messages)
-                    {
-                        await DeleteEventInternal(streamId, message.MessageId, cancellationToken).ConfigureAwait(false);
-                    }
-                }
-            }
-        }
-    }
+			if (streamMessagesPage.Status == PageReadStatus.Success) {
+				foreach (var message in streamMessagesPage.Messages) {
+					await DeleteEventInternal(streamId, message.MessageId, cancellationToken).ConfigureAwait(false);
+				}
+			}
+		}
+	}
 }

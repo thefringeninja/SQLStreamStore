@@ -1,17 +1,13 @@
-﻿ // ReSharper disable once CheckNamespace
-namespace SqlStreamStore
-{
-    using System.Threading.Tasks;
-    using SqlStreamStore.InMemory;
-    using Xunit.Abstractions;
+﻿// ReSharper disable once CheckNamespace
+namespace SqlStreamStore;
 
-    public class InMemoryAcceptanceTests : AcceptanceTests
-    {
-        public InMemoryAcceptanceTests(ITestOutputHelper testOutputHelper)
-            : base(testOutputHelper)
-        { }
+using System.Threading.Tasks;
+using Meziantou.Xunit;
+using SqlStreamStore.InMemory;
+using Xunit.Abstractions;
 
-        protected override Task<IStreamStoreFixture> CreateFixture() 
-            => Task.FromResult<IStreamStoreFixture>(new InMemoryStreamStoreFixture());
-    }
+[EnableParallelization]
+public class InMemoryAcceptanceTests(ITestOutputHelper testOutputHelper) : AcceptanceTests(testOutputHelper) {
+	protected override Task<IStreamStoreFixture> CreateFixture()
+		=> Task.FromResult<IStreamStoreFixture>(new InMemoryStreamStoreFixture(loggerFactory: LoggerFactory));
 }

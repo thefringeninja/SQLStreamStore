@@ -1,110 +1,99 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.Data.SqlClient;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.TestUtils.MsSql;
+﻿namespace SqlStreamStore;
 
-    public class MsSqlStreamStoreV3Fixture : IStreamStoreFixture
-    {
-        private readonly Action _onDispose;
-        private readonly MsSqlStreamStoreV3Settings _settings;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.TestUtils.MsSql;
 
-        public MsSqlStreamStoreV3Fixture(
-            string schema,
-            SqlServerContainer dockerInstance,
-            string databaseName,
-            Action onDispose)
-        {
-            _onDispose = onDispose;
+public class MsSqlStreamStoreV3Fixture : IStreamStoreFixture {
+	private readonly Action _onDispose;
+	private readonly MsSqlStreamStoreV3Settings _settings;
 
-            DatabaseName = databaseName;
-            var connectionStringBuilder = dockerInstance.CreateConnectionStringBuilder();
-            connectionStringBuilder.MultipleActiveResultSets = true;
-            connectionStringBuilder.InitialCatalog = DatabaseName;
-            var connectionString = connectionStringBuilder.ToString();
+	public MsSqlStreamStoreV3Fixture(
+		string schema,
+		SqlServerContainer dockerInstance,
+		string databaseName,
+		Action onDispose,
+		ILoggerFactory loggerFactory) {
+		_onDispose = onDispose;
 
-            _settings = new MsSqlStreamStoreV3Settings(connectionString)
-            {
-                Schema = schema,
-                GetUtcNow = () => GetUtcNow(),
-                DisableDeletionTracking = false
-            };
-        }
+		DatabaseName = databaseName;
+		var connectionStringBuilder = dockerInstance.CreateConnectionStringBuilder();
+		connectionStringBuilder.MultipleActiveResultSets = true;
+		connectionStringBuilder.InitialCatalog = DatabaseName;
+		var connectionString = connectionStringBuilder.ToString();
 
-        public void Dispose()
-        {
-            Store.Dispose();
-            MsSqlStreamStoreV3 = null;
-            _onDispose();
-        }
-        public IStreamStore  StoreFor(string user)
-        {
-            var connectionStringBuilder = new SqlConnectionStringBuilder(_settings.ConnectionString)
-            {
-                UserID = user,
-                Password = Password(user),
-            };
-            var connectionString = connectionStringBuilder.ToString();
-            var settings = new MsSqlStreamStoreV3Settings(connectionString)
-            {
-                Schema = _settings.Schema,
-                GetUtcNow = () => _settings.GetUtcNow(),
-                CommandTimeout = _settings.CommandTimeout,
-                CreateStreamStoreNotifier = _settings.CreateStreamStoreNotifier,
-                DisableDeletionTracking = _settings.DisableDeletionTracking,
-                LogName = _settings.LogName,
-            };
-            return new MsSqlStreamStoreV3(settings);
-        }
+		_settings = new MsSqlStreamStoreV3Settings(connectionString, loggerFactory) {
+			Schema = schema,
+			GetUtcNow = () => GetUtcNow(),
+			DisableDeletionTracking = false,
+		};
+	}
 
-        public async Task CreateUser(string user, CancellationToken cancellationToken = default)
-        {
-            string createUser = $"USE [{DatabaseName}];" +
-                                $"IF SUSER_ID('{user}') IS NULL CREATE LOGIN [{user}] WITH PASSWORD='{Password(user)}';" +
-                                $"IF DATABASE_PRINCIPAL_ID('{user}') IS NULL CREATE USER [{user}] FOR LOGIN[{user}] ;";
+	public void Dispose() {
+		Store.Dispose();
+		MsSqlStreamStoreV3 = null!;
+		_onDispose();
+	}
+	public IStreamStore StoreFor(string user) {
+		var connectionStringBuilder = new SqlConnectionStringBuilder(_settings.ConnectionString) {
+			UserID = user,
+			Password = Password(user),
+		};
+		var connectionString = connectionStringBuilder.ToString();
+		var settings = new MsSqlStreamStoreV3Settings(connectionString) {
+			Schema = _settings.Schema,
+			GetUtcNow = () => _settings.GetUtcNow(),
+			CommandTimeout = _settings.CommandTimeout,
+			CreateStreamStoreNotifier = _settings.CreateStreamStoreNotifier,
+			DisableDeletionTracking = _settings.DisableDeletionTracking,
+			LogName = _settings.LogName,
+		};
+		return new MsSqlStreamStoreV3(settings);
+	}
 
-            using(var connection = new SqlConnection(_settings.ConnectionString))
-            {
-                using(var command = new SqlCommand(createUser, connection))
-                {
-                    await connection
-                        .OpenAsync(cancellationToken)
-                        .ConfigureAwait(false);
-                    await command
-                        .ExecuteScalarAsync(cancellationToken)
-                        .ConfigureAwait(false);
-                }
-            }
-        }
-        private static string Password(string user) => $"{user}@1EasyPassword";
+	public async Task CreateUser(string user, CancellationToken cancellationToken = default) {
+		string createUser = $"USE [{DatabaseName}];" +
+		                    $"IF SUSER_ID('{user}') IS NULL CREATE LOGIN [{user}] WITH PASSWORD='{Password(user)}';" +
+		                    $"IF DATABASE_PRINCIPAL_ID('{user}') IS NULL CREATE USER [{user}] FOR LOGIN[{user}] ;";
 
-        public string DatabaseName { get; }
+		using (var connection = new SqlConnection(_settings.ConnectionString)) {
+			using (var command = new SqlCommand(createUser, connection)) {
+				await connection
+					.OpenAsync(cancellationToken)
+					.ConfigureAwait(false);
+				await command
+					.ExecuteScalarAsync(cancellationToken)
+					.ConfigureAwait(false);
+			}
+		}
+	}
+	private static string Password(string user) => $"{user}@1EasyPassword";
 
-        public IStreamStore Store => MsSqlStreamStoreV3;
+	public string DatabaseName { get; }
 
-        public MsSqlStreamStoreV3 MsSqlStreamStoreV3 { get; private set; }
+	public IStreamStore Store => MsSqlStreamStoreV3;
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public MsSqlStreamStoreV3 MsSqlStreamStoreV3 { get; private set; } = null!;
 
-        public long MinPosition { get; set; } = 0;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public int MaxSubscriptionCount { get; set; } = 500;
+	public long MinPosition { get; set; } = 0;
 
-        public bool DisableDeletionTracking
-        {
-            get => _settings.DisableDeletionTracking;
-            set => _settings.DisableDeletionTracking = value;
-        }
+	public int MaxSubscriptionCount { get; set; } = 500;
 
-        public async Task Prepare()
-        {
-            _settings.DisableDeletionTracking = false;
-            MsSqlStreamStoreV3 = new MsSqlStreamStoreV3(_settings);
-            await MsSqlStreamStoreV3.DropAll();
-            await MsSqlStreamStoreV3.CreateSchemaIfNotExists();
-        }
-    }
+	public bool DisableDeletionTracking {
+		get => _settings.DisableDeletionTracking;
+		set => _settings.DisableDeletionTracking = value;
+	}
+
+	public async Task Prepare() {
+		_settings.DisableDeletionTracking = false;
+		MsSqlStreamStoreV3 = new MsSqlStreamStoreV3(_settings);
+		await MsSqlStreamStoreV3.DropAll();
+		await MsSqlStreamStoreV3.CreateSchemaIfNotExists();
+	}
 }

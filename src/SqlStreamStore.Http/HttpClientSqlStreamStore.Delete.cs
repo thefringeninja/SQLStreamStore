@@ -1,76 +1,68 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Imports.Ensure.That;
-    using SqlStreamStore.Internal.HoneyBearHalClient;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    partial class HttpClientSqlStreamStore
-    {
-        public async Task DeleteStream(
-            StreamId streamId,
-            int expectedVersion = ExpectedVersion.Any,
-            CancellationToken cancellationToken = default)
-        {
-            Ensure.That(expectedVersion, nameof(expectedVersion)).IsGte(ExpectedVersion.Any);
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+using SqlStreamStore.Streams;
 
-            GuardAgainstDisposed();
+partial class HttpClientSqlStreamStore {
+	public async Task DeleteStream(
+		StreamId streamId,
+		int expectedVersion = ExpectedVersion.Any,
+		CancellationToken cancellationToken = default) {
+		ArgumentOutOfRangeException.ThrowIfLessThan(expectedVersion, ExpectedVersion.Any);
 
-            var client = CreateClient(new Resource
-            {
-                Links =
-                {
-                    new Link
-                    {
-                        Href = LinkFormatter.Stream(streamId),
-                        Rel = Constants.Relations.DeleteStream
-                    }
-                }
-            });
+		GuardAgainstDisposed();
 
-            client = await client.Delete(
-                Constants.Relations.DeleteStream,
-                null,
-                null,
-                new Dictionary<string, string[]>
-                {
-                    [Constants.Headers.ExpectedVersion] = new[] { $"{expectedVersion}" }
-                },
-                cancellationToken);
+		var client = CreateClient(new Resource {
+			Links =
+			{
+				new Link
+				{
+					Href = LinkFormatter.Stream(streamId),
+					Rel = Constants.Relations.DeleteStream
+				}
+			}
+		});
 
-            ThrowOnError(client);
-        }
+		client = await client.Delete(
+			Constants.Relations.DeleteStream,
+			null,
+			null,
+			new Dictionary<string, string[]> {
+				[Constants.Headers.ExpectedVersion] = new[] { $"{expectedVersion}" }
+			},
+			cancellationToken);
 
-        public async Task DeleteMessage(
-            StreamId streamId,
-            Guid messageId,
-            CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+		ThrowOnError(client);
+	}
 
-            var client = CreateClient(new Resource
-            {
-                Links =
-                {
-                    new Link
-                    {
-                        Href = LinkFormatter.StreamMessageByMessageId(streamId, messageId),
-                        Rel = Constants.Relations.DeleteMessage
-                    }
-                }
-            });
+	public async Task DeleteMessage(
+		StreamId streamId,
+		Guid messageId,
+		CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-            client = await client.Delete(
-                Constants.Relations.DeleteMessage,
-                null,
-                null,
-                cancellationToken: cancellationToken);
+		var client = CreateClient(new Resource {
+			Links =
+			{
+				new Link
+				{
+					Href = LinkFormatter.StreamMessageByMessageId(streamId, messageId),
+					Rel = Constants.Relations.DeleteMessage
+				}
+			}
+		});
 
-            ThrowOnError(client);
-        }
-    }
+		client = await client.Delete(
+			Constants.Relations.DeleteMessage,
+			null,
+			null,
+			cancellationToken: cancellationToken);
+
+		ThrowOnError(client);
+	}
 }

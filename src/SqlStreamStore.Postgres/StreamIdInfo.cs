@@ -1,19 +1,17 @@
-﻿namespace SqlStreamStore
+﻿namespace SqlStreamStore;
+
+using System;
+
+internal struct StreamIdInfo // Love this name
 {
-    using SqlStreamStore.Imports.Ensure.That;
+	public readonly PostgresqlStreamId PostgresqlStreamId;
 
-    internal struct StreamIdInfo // Love this name
-    {
-        public readonly PostgresqlStreamId PostgresqlStreamId;
+	public readonly PostgresqlStreamId MetadataPosgresqlStreamId;
 
-        public readonly PostgresqlStreamId MetadataPosgresqlStreamId;
+	public StreamIdInfo(string idOriginal) {
+		ArgumentException.ThrowIfNullOrWhiteSpace(idOriginal);
 
-        public StreamIdInfo(string idOriginal)
-        {
-            Ensure.That(idOriginal, nameof(idOriginal)).IsNotNullOrWhiteSpace();
-
-            PostgresqlStreamId = new PostgresqlStreamId(idOriginal);
-            MetadataPosgresqlStreamId = new PostgresqlStreamId("$$" + idOriginal);
-        }
-    }
+		PostgresqlStreamId = new PostgresqlStreamId(idOriginal);
+		MetadataPosgresqlStreamId = new PostgresqlStreamId("$$" + idOriginal);
+	}
 }

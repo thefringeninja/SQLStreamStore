@@ -1,33 +1,28 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System.Linq;
-    using Halcyon.HAL;
-    using Microsoft.AspNetCore.Builder;
-    using MidFunc = System.Func<
-        Microsoft.AspNetCore.Http.HttpContext,
-        System.Func<System.Threading.Tasks.Task>,
-        System.Threading.Tasks.Task
-    >;
+﻿namespace SqlStreamStore.HAL;
 
-    internal static class AcceptMiddleware
-    {
-        public static IApplicationBuilder UseAccept(this IApplicationBuilder builder, params string[] acceptable)
-            => builder.Use(Accept(acceptable));
+using System.Linq;
+using Microsoft.AspNetCore.Builder;
+using MidFunc = System.Func<
+	Microsoft.AspNetCore.Http.HttpContext,
+	System.Func<System.Threading.Tasks.Task>,
+	System.Threading.Tasks.Task
+>;
 
-        private static MidFunc Accept(params string[] acceptable) => (context, next) =>
-        {
-            var acceptHeaders = context.Request.GetAcceptHeaders();
+internal static class AcceptMiddleware {
+	public static IApplicationBuilder UseAccept(this IApplicationBuilder builder, params string[] acceptable)
+		=> builder.Use(Accept(acceptable));
 
-            return acceptHeaders.Any(
-                acceptHeader => acceptHeader == Constants.MediaTypes.Any || acceptable.Contains(acceptHeader))
-                ? next()
-                : context.WriteResponse(new HalJsonResponse(new HALResponse(new
-                    {
-                        type = "Not Acceptable",
-                        title = "Not Acceptable",
-                        detail = $"The target resource only understands {string.Join(", ", acceptable)}."
-                    }),
-                    406));
-        };
-    }
+	private static MidFunc Accept(params string[] acceptable) => (context, next) => {
+		var acceptHeaders = context.Request.GetAcceptHeaders();
+
+		return acceptHeaders.Any(
+			acceptHeader => acceptHeader == Constants.MediaTypes.Any || acceptable.Contains(acceptHeader))
+			? next()
+			: context.WriteResponse(new HalJsonResponse(new HALResponse(new {
+					type = "Not Acceptable",
+					title = "Not Acceptable",
+					detail = $"The target resource only understands {string.Join(", ", acceptable)}."
+				}),
+				406));
+	};
 }

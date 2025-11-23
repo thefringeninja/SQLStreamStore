@@ -1,18 +1,16 @@
-namespace SqlStreamStore
-{
-    using System;
-    using SqlStreamStore.Infrastructure;
+namespace SqlStreamStore;
 
-    public interface IStreamStoreFixture: IDisposable
-    {
-        IStreamStore Store { get; }
+using System;
+using SqlStreamStore.Infrastructure;
 
-        GetUtcNow GetUtcNow { get; set; }
+public interface IStreamStoreFixture : IDisposable {
+	IStreamStore Store { get; }
 
-        long MinPosition { get; set; }
+	GetUtcNow GetUtcNow { get; set; }
 
-        int MaxSubscriptionCount { get; set; }
+	long MinPosition { get; set; }
 
-        bool DisableDeletionTracking { get; set; }
-    }
+	int MaxSubscriptionCount { get; set; }
+
+	bool DisableDeletionTracking { get; set; }
 }

@@ -1,58 +1,51 @@
-﻿namespace SqlStreamStore.HAL.AllStreamMessage
-{
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Halcyon.HAL;
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore.HAL.AllStreamMessage;
 
-    internal class AllStreamMessageResource : IResource
-    {
-        private readonly IStreamStore _streamStore;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Streams;
 
-        public SchemaSet Schema { get; }
+internal class AllStreamMessageResource : IResource {
+	private readonly IStreamStore _streamStore;
 
-        public AllStreamMessageResource(IStreamStore streamStore)
-        {
-            if(streamStore == null)
-                throw new ArgumentNullException(nameof(streamStore));
-            _streamStore = streamStore;
-        }
+	public SchemaSet? Schema { get; }
 
-        public async Task<Response> Get(
-            ReadAllStreamMessageOperation operation,
-            CancellationToken cancellationToken)
-        {
-            var message = await operation.Invoke(_streamStore, cancellationToken);
+	public AllStreamMessageResource(IStreamStore streamStore) {
+		ArgumentNullException.ThrowIfNull(streamStore);
+		_streamStore = streamStore;
+	}
 
-            var links = Links
-                .FromOperation(operation)
-                .Index()
-                .Find()
-                .Browse()
-                .Add(
-                    Constants.Relations.Message,
-                    LinkFormatter.AllStreamMessageByPosition(message.Position),
-                    $"{message.StreamId}@{message.StreamVersion}")
-                .Self()
-                .Add(
-                    Constants.Relations.Feed,
-                    LinkFormatter.ReadAllBackwards(
-                        Position.End,
-                        Constants.MaxCount,
-                        false));
+	public async Task<Response> Get(
+		ReadAllStreamMessageOperation operation,
+		CancellationToken cancellationToken) {
+		var message = await operation.Invoke(_streamStore, cancellationToken);
 
-            if(message.MessageId == Guid.Empty)
-            {
-                return new HalJsonResponse(
-                    new HALResponse(null)
-                        .AddLinks(links),
-                    404);
-            }
+		var links = Links
+			.FromOperation(operation)
+			.Index()
+			.Find()
+			.Browse()
+			.Add(
+				Constants.Relations.Message,
+				LinkFormatter.AllStreamMessageByPosition(message.Position),
+				$"{message.StreamId}@{message.StreamVersion}")
+			.Self()
+			.Add(
+				Constants.Relations.Feed,
+				LinkFormatter.ReadAllBackwards(
+					Position.End,
+					Constants.MaxCount,
+					false));
 
-            var payload = await message.GetJsonData(cancellationToken);
+		if (message.MessageId == Guid.Empty) {
+			return new HalJsonResponse(
+				new HALResponse(null)
+					.AddLinks(links),
+				404);
+		}
 
-            return new HalJsonResponse(new StreamMessageHALResponse(message, payload).AddLinks(links));
-        }
-    }
+		var payload = await message.GetJsonData(cancellationToken);
+
+		return new HalJsonResponse(new StreamMessageHALResponse(message, payload).AddLinks(links));
+	}
 }

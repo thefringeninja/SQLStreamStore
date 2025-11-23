@@ -1,103 +1,92 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Threading.Tasks;
-    using Npgsql;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.TestUtils.Postgres;
+namespace SqlStreamStore;
 
-    public class PostgresStreamStoreFixture : IStreamStoreFixture
-    {
-        private readonly Action _onDispose;
-        private bool _preparedPreviously;
-        private readonly PostgresStreamStoreSettings _settings;
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.TestUtils.Postgres;
 
-        public PostgresStreamStoreFixture(
-            string schema,
-            PostgresContainer dockerInstance,
-            string databaseName,
-            Action onDispose)
-        {
-            _onDispose = onDispose;
+public class PostgresStreamStoreFixture : IStreamStoreFixture {
+	private readonly Action _onDispose;
+	private bool _preparedPreviously;
+	private readonly PostgresStreamStoreSettings _settings;
 
-            DatabaseName = databaseName;
-            var connectionString = dockerInstance.ConnectionString;
+	public PostgresStreamStoreFixture(
+		string schema,
+		PostgresContainer dockerInstance,
+		string databaseName,
+		Action onDispose,
+		ILoggerFactory loggerFactory) {
+		_onDispose = onDispose;
 
-            _settings = new PostgresStreamStoreSettings(connectionString)
-            {
-                Schema = schema,
-                GetUtcNow = () => GetUtcNow(),
-                DisableDeletionTracking = false,
-                ScavengeAsynchronously = false,
-            };
-        }
+		DatabaseName = databaseName;
+		var connectionString = dockerInstance.ConnectionString;
 
-        public void Dispose()
-        {
-            Store.Dispose();
-            PostgresStreamStore = null;
-            _onDispose();
-        }
+		_settings = new PostgresStreamStoreSettings(connectionString, loggerFactory) {
+			Schema = schema,
+			GetUtcNow = () => GetUtcNow(),
+			DisableDeletionTracking = false,
+			ScavengeAsynchronously = false,
+		};
+	}
 
-        public string DatabaseName { get; }
+	public void Dispose() {
+		Store.Dispose();
+		PostgresStreamStore = null!;
+		_onDispose();
+	}
 
-        public IStreamStore Store => PostgresStreamStore;
+	public string DatabaseName { get; }
 
-        public PostgresStreamStore PostgresStreamStore { get; private set; }
+	public IStreamStore Store => PostgresStreamStore;
 
-        public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
+	public PostgresStreamStore PostgresStreamStore { get; private set; } = null!;
 
-        public long MinPosition { get; set; } = 0;
+	public GetUtcNow GetUtcNow { get; set; } = SystemClock.GetUtcNow;
 
-        public int MaxSubscriptionCount { get; set; } = 100;
+	public long MinPosition { get; set; } = 0;
 
-        public bool DisableDeletionTracking
-        {
-            get => _settings.DisableDeletionTracking;
-            set => _settings.DisableDeletionTracking = value;
-        }
+	public int MaxSubscriptionCount { get; set; } = 100;
 
-        public async Task Prepare()
-        {
-            _settings.DisableDeletionTracking = false;
-            PostgresStreamStore = new PostgresStreamStore(_settings);
+	public bool DisableDeletionTracking {
+		get => _settings.DisableDeletionTracking;
+		set => _settings.DisableDeletionTracking = value;
+	}
 
-            await PostgresStreamStore.CreateSchemaIfNotExists();
-            if (_preparedPreviously)
-            {
-                using (var connection = new NpgsqlConnection(_settings.ConnectionString))
-                {
-                    connection.Open();
+	public async Task Prepare() {
+		_settings.DisableDeletionTracking = false;
+		PostgresStreamStore = new PostgresStreamStore(_settings);
 
-                    var schema = _settings.Schema;
+		await PostgresStreamStore.CreateSchemaIfNotExists();
+		if (_preparedPreviously) {
+			using (var connection = new NpgsqlConnection(_settings.ConnectionString)) {
+				connection.Open();
 
-                    var commandText = $"DELETE FROM {schema}.messages";
-                    using (var command = new NpgsqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+				var schema = _settings.Schema;
 
-                    commandText = $"DELETE FROM {schema}.streams";
-                    using (var command = new NpgsqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+				var commandText = $"DELETE FROM {schema}.messages";
+				using (var command = new NpgsqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
 
-                    commandText = $"ALTER SEQUENCE {schema}.streams_seq RESTART WITH 1;";
-                    using (var command = new NpgsqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+				commandText = $"DELETE FROM {schema}.streams";
+				using (var command = new NpgsqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
 
-                    commandText = $"ALTER SEQUENCE {schema}.messages_seq RESTART WITH 0;";
-                    using (var command = new NpgsqlCommand(commandText, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
-                }
-            }
+				commandText = $"ALTER SEQUENCE {schema}.streams_seq RESTART WITH 1;";
+				using (var command = new NpgsqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
 
-            _preparedPreviously = true;
-        }
-    }
+				commandText = $"ALTER SEQUENCE {schema}.messages_seq RESTART WITH 0;";
+				using (var command = new NpgsqlCommand(commandText, connection)) {
+					command.ExecuteNonQuery();
+				}
+			}
+		}
+
+		_preparedPreviously = true;
+	}
 }

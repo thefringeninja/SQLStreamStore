@@ -1,31 +1,28 @@
-namespace SqlStreamStore.HAL.StreamMessage.Version
-{
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.AspNetCore.Routing;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore.HAL.StreamMessage.Version;
 
-    internal class ReadStreamMessageByStreamVersionOperation : IStreamStoreOperation<StreamMessage>
-    {
-        public ReadStreamMessageByStreamVersionOperation(HttpContext context)
-        {
-            var request = context.Request;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using SqlStreamStore.Streams;
 
-            Path = request.Path;
+internal class ReadStreamMessageByStreamVersionOperation : IStreamStoreOperation<StreamMessage> {
+	public ReadStreamMessageByStreamVersionOperation(HttpContext context) {
+		var request = context.Request;
 
-            StreamId = context.GetRouteData().GetStreamId();
-            StreamVersion = context.GetRouteData().GetStreamVersion();
-        }
+		Path = request.Path;
 
-        public PathString Path { get; }
-        public int StreamVersion { get; }
-        public string StreamId { get; }
+		StreamId = context.GetRouteData().GetStreamId();
+		StreamVersion = context.GetRouteData().GetStreamVersion();
+	}
 
-        public async Task<StreamMessage> Invoke(IStreamStore streamStore, CancellationToken ct)
-            => (await streamStore.ReadStreamBackwards(StreamId, StreamVersion, 1, true, ct))
-                .Messages.FirstOrDefault(message => StreamVersion == SqlStreamStore.Streams.StreamVersion.End
-                                                    || message.StreamVersion == StreamVersion);
-    }
+	public PathString Path { get; }
+	public int StreamVersion { get; }
+	public string StreamId { get; }
+
+	public async Task<StreamMessage> Invoke(IStreamStore streamStore, CancellationToken ct)
+		=> (await streamStore.ReadStreamBackwards(StreamId, StreamVersion, 1, true, ct))
+			.Messages.FirstOrDefault(message => StreamVersion == SqlStreamStore.Streams.StreamVersion.End
+			                                    || message.StreamVersion == StreamVersion);
 }

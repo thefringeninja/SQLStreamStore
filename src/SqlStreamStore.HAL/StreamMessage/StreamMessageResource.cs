@@ -1,93 +1,81 @@
-namespace SqlStreamStore.HAL.StreamMessage
-{
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Halcyon.HAL;
-    using SqlStreamStore.HAL.StreamMessage.MessageId;
-    using SqlStreamStore.HAL.StreamMessage.Version;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore.HAL.StreamMessage;
 
-    internal class StreamMessageResource : IResource
-    {
-        private readonly IStreamStore _streamStore;
-        public SchemaSet Schema { get; }
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.HAL.StreamMessage.MessageId;
+using SqlStreamStore.HAL.StreamMessage.Version;
+using SqlStreamStore.Streams;
 
-        public StreamMessageResource(IStreamStore streamStore)
-        {
-            if(streamStore == null)
-                throw new ArgumentNullException(nameof(streamStore));
-            _streamStore = streamStore;
-            Schema = new SchemaSet<StreamMessageResource>();
-        }
+internal class StreamMessageResource : IResource {
+	private readonly IStreamStore _streamStore;
+	public SchemaSet? Schema { get; }
 
-        private HALResponse DeleteStreamMessage => Schema.GetSchema("delete-message");
+	public StreamMessageResource(IStreamStore streamStore) {
+		ArgumentNullException.ThrowIfNull(streamStore);
+		_streamStore = streamStore;
+		Schema = new SchemaSet<StreamMessageResource>();
+	}
 
-        public async Task<Response> Get(
-            ReadStreamMessageByStreamVersionOperation operation,
-            CancellationToken cancellationToken)
-        {
-            var message = await operation.Invoke(_streamStore, cancellationToken);
+	private HALResponse DeleteStreamMessage => Schema!.GetSchema("delete-message");
 
-            var links = Links
-                .FromPath(operation.Path)
-                .Index()
-                .Find()
-                .Browse()
-                .StreamMessageNavigation(message, operation);
+	public async Task<Response> Get(
+		ReadStreamMessageByStreamVersionOperation operation,
+		CancellationToken cancellationToken) {
+		var message = await operation.Invoke(_streamStore, cancellationToken);
 
-            if(message.MessageId == Guid.Empty)
-            {
-                return new HalJsonResponse(
-                    new HALResponse(new
-                        {
-                            operation.StreamId,
-                            operation.StreamVersion
-                        })
-                        .AddLinks(links),
-                    404);
-            }
+		var links = Links
+			.FromPath(operation.Path)
+			.Index()
+			.Find()
+			.Browse()
+			.StreamMessageNavigation(message, operation);
 
-            if(operation.StreamVersion == StreamVersion.End)
-            {
-                return new TemporaryRedirectResponse($"{message.StreamVersion}");
-            }
+		if (message.MessageId == Guid.Empty) {
+			return new HalJsonResponse(
+				new HALResponse(new {
+						operation.StreamId,
+						operation.StreamVersion
+					})
+					.AddLinks(links),
+				404);
+		}
 
-            var payload = await message.GetJsonData(cancellationToken);
+		if (operation.StreamVersion == StreamVersion.End) {
+			return new TemporaryRedirectResponse($"{message.StreamVersion}");
+		}
 
-            var eTag = ETag.FromStreamVersion(message.StreamVersion);
+		var payload = await message.GetJsonData(cancellationToken);
 
-            return new HalJsonResponse(
-                new StreamMessageHALResponse(message, payload)
-                    .AddEmbeddedResource(
-                        Constants.Relations.DeleteMessage,
-                        DeleteStreamMessage)
-                    .AddLinks(links))
-            {
-                Headers =
-                {
-                    eTag,
-                    CacheControl.OneYear
-                }
-            };
-        }
+		var eTag = ETag.FromStreamVersion(message.StreamVersion);
 
-        public async Task<Response> Delete(
-            DeleteStreamMessageByMessageIdOperation operation,
-            CancellationToken cancellationToken)
-        {
-            await operation.Invoke(_streamStore, cancellationToken);
+		return new HalJsonResponse(
+			new StreamMessageHALResponse(message, payload)
+				.AddEmbeddedResource(
+					Constants.Relations.DeleteMessage,
+					DeleteStreamMessage)
+				.AddLinks(links)) {
+			Headers =
+			{
+				eTag,
+				CacheControl.OneYear
+			}
+		};
+	}
 
-            return NoContentResponse.Instance;
-        }
+	public async Task<Response> Delete(
+		DeleteStreamMessageByMessageIdOperation operation,
+		CancellationToken cancellationToken) {
+		await operation.Invoke(_streamStore, cancellationToken);
 
-        public async Task<Response> Delete(
-            DeleteStreamMessageByVersionOperation operation,
-            CancellationToken cancellationToken)
-        {
-            await operation.Invoke(_streamStore, cancellationToken);
+		return NoContentResponse.Instance;
+	}
 
-            return NoContentResponse.Instance;
-        }
-    }
+	public async Task<Response> Delete(
+		DeleteStreamMessageByVersionOperation operation,
+		CancellationToken cancellationToken) {
+		await operation.Invoke(_streamStore, cancellationToken);
+
+		return NoContentResponse.Instance;
+	}
 }

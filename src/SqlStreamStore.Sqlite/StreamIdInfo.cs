@@ -1,36 +1,29 @@
-namespace SqlStreamStore
+namespace SqlStreamStore;
+
+using System;
+using System.Security.Cryptography;
+using System.Text;
+
+internal struct StreamIdInfo // Hate this name
 {
-    using System;
-    using System.Security.Cryptography;
-    using System.Text;
-    using SqlStreamStore.Imports.Ensure.That;
+	public readonly SqliteStreamId SqlStreamId;
 
-    internal struct StreamIdInfo // Hate this name
-    {
-        public readonly SqliteStreamId SqlStreamId;
+	public readonly SqliteStreamId MetadataSqlStreamId;
 
-        public readonly SqliteStreamId MetadataSqlStreamId;
+	public StreamIdInfo(string idOriginal) {
+		ArgumentException.ThrowIfNullOrWhiteSpace(idOriginal);
 
-        public StreamIdInfo(string idOriginal)
-        {
-            Ensure.That(idOriginal, "streamId").IsNotNullOrWhiteSpace();
-
-            string id;
-            Guid _;
-            if(Guid.TryParse(idOriginal, out _))
-            {
-                id = idOriginal; //If the ID is a GUID, don't bother hashing it.
-            }
-            else
-            {
-                using(var sha1 = SHA1.Create())
-                {
-                    var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(idOriginal));
-                    id = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
-                }
-            }
-            SqlStreamId = new SqliteStreamId(id, idOriginal);
-            MetadataSqlStreamId = new SqliteStreamId("$$" + id, "$$" + idOriginal);
-        }
-    }
+		string id;
+		Guid _;
+		if (Guid.TryParse(idOriginal, out _)) {
+			id = idOriginal; //If the ID is a GUID, don't bother hashing it.
+		} else {
+			using (var sha1 = SHA1.Create()) {
+				var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(idOriginal));
+				id = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+			}
+		}
+		SqlStreamId = new SqliteStreamId(id, idOriginal);
+		MetadataSqlStreamId = new SqliteStreamId("$$" + id, "$$" + idOriginal);
+	}
 }

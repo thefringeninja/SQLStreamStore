@@ -1,55 +1,46 @@
-namespace SqlStreamStore.Internal.HoneyBearHalClient.Models
-{
-    using System;
-    using System.Collections.Generic;
-    using System.ComponentModel;
-    using System.Linq;
-    using System.Reflection;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
+namespace SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-    internal static class ResourceConverterExtensions
-    {
-        internal static T Data<T>(this IResource source)
-            where T : class, new()
-        {
-            var data = new T();
-            var dataType = typeof(T);
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
-            foreach(var property in dataType.GetTypeInfo().DeclaredProperties)
-            {
-                var propertyName = property.Name;
-                var attribute = property.GetCustomAttributes<JsonPropertyAttribute>().FirstOrDefault();
-                if(!string.IsNullOrEmpty(attribute?.PropertyName))
-                    propertyName = attribute.PropertyName;
+internal static class ResourceConverterExtensions {
+	internal static T Data<T>(this IResource source)
+		where T : class {
+		var data = Activator.CreateInstance<T>();
+		var dataType = typeof(T);
 
-                var pair = source.FirstOrDefault(p => p.Key.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
-                if(pair.Key == null)
-                    continue;
+		foreach (var property in dataType.GetTypeInfo().DeclaredProperties) {
+			var propertyName = property.Name;
+			var attribute = property.GetCustomAttributes<JsonPropertyNameAttribute>().FirstOrDefault();
+			if (!string.IsNullOrEmpty(attribute?.Name))
+				propertyName = attribute.Name;
 
-                var propertyType = property.PropertyType;
+			var pair = source.FirstOrDefault(p => p.Key.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+			if (pair.Key == null)
+				continue;
 
-                object value;
-                var complex = pair.Value as JObject;
-                var array = pair.Value as JArray;
+			var propertyType = property.PropertyType;
 
-                if(complex != null)
-                    value = complex.ToObject(propertyType);
-                else if(array != null)
-                    value = array.ToObject(propertyType);
-                else if(pair.Value != null)
-                    value = TypeDescriptor.GetConverter(propertyType).ConvertFromString(pair.Value.ToString());
-                else
-                    value = null;
+			property.SetValue(data,
+				pair.Value switch {
+					JsonObject complex => JsonSerializer.Deserialize(complex.ToString(), propertyType),
+					JsonArray array => JsonSerializer.Deserialize(array.ToString(), propertyType),
+					not null => TypeDescriptor.GetConverter(propertyType).ConvertFromString(pair.Value.ToString()!),
+					_ => null
+				},
+				null);
+		}
 
-                property.SetValue(data, value, null);
-            }
+		return data;
+	}
 
-            return data;
-        }
-
-        public static IEnumerable<T> Data<T>(this IEnumerable<IResource<T>> source)
-            where T : class, new()
-            => source.Select(s => s.Data);
-    }
+	public static IEnumerable<T> Data<T>(this IEnumerable<IResource<T>> source)
+		where T : class, new()
+		=> source.Select(s => s.Data);
 }

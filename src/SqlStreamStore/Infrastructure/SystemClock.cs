@@ -1,9 +1,7 @@
-﻿namespace SqlStreamStore.Infrastructure
-{
-    using System;
+﻿namespace SqlStreamStore.Infrastructure;
 
-    public static class SystemClock
-    {
-        public static readonly GetUtcNow GetUtcNow = () => DateTime.UtcNow;
-    }
+using System;
+
+public static class SystemClock {
+	public static readonly GetUtcNow GetUtcNow = () => DateTime.UtcNow;
 }

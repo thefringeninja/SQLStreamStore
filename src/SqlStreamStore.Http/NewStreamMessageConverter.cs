@@ -1,42 +1,33 @@
-namespace SqlStreamStore
-{
-    using System;
-    using Newtonsoft.Json;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    internal class NewStreamMessageConverter : JsonConverter<NewStreamMessage>
-    {
-        public override bool CanRead => false;
+using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using SqlStreamStore.Streams;
 
-        public override void WriteJson(JsonWriter writer, NewStreamMessage value, JsonSerializer serializer)
-        {
-            writer.WriteStartObject();
+internal class NewStreamMessageConverter : JsonConverter<NewStreamMessage> {
+	public override NewStreamMessage Read(
+		ref Utf8JsonReader reader,
+		Type typeToConvert,
+		JsonSerializerOptions options) =>
+		throw new NotImplementedException();
 
-            if(value.JsonMetadata != null)
-            {
-                writer.WritePropertyName("jsonMetadata");
-                writer.WriteRawValue(value.JsonMetadata);
-            }
+	public override void Write(Utf8JsonWriter writer, NewStreamMessage value, JsonSerializerOptions options) {
+		writer.WriteStartObject();
 
-            writer.WritePropertyName("messageId");
-            writer.WriteValue(value.MessageId);
+		if (!string.IsNullOrEmpty(value.JsonMetadata)) {
+			writer.WritePropertyName("jsonMetadata");
+			writer.WriteRawValue(value.JsonMetadata);
+		}
 
-            writer.WritePropertyName("type");
-            writer.WriteValue(value.Type);
+		writer.WriteString("messageId", value.MessageId);
 
-            writer.WritePropertyName("jsonData");
-            writer.WriteRawValue(value.JsonData);
+		writer.WriteString("type", value.Type);
+
+		writer.WritePropertyName("jsonData");
+		writer.WriteRawValue(value.JsonData);
 
 
-            writer.WriteEndObject();
-        }
-
-        public override NewStreamMessage ReadJson(
-            JsonReader reader,
-            Type objectType,
-            NewStreamMessage existingValue,
-            bool hasExistingValue,
-            JsonSerializer serializer) =>
-            throw new NotImplementedException();
-    }
+		writer.WriteEndObject();
+	}
 }

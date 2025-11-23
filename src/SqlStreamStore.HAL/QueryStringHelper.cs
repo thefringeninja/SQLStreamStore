@@ -1,51 +1,42 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System;
-    using System.Collections.Generic;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.Extensions.Primitives;
+﻿namespace SqlStreamStore.HAL;
 
-    internal static class QueryStringHelper
-    {
-        private static readonly char[] s_delimiter = { '=' };
-        private static readonly QueryString s_almostEmpty = new QueryString("?");
+using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 
-        public static Dictionary<string, StringValues> ParseQueryString(QueryString queryString)
-        {
-            var state = new Dictionary<string, StringValues>();
+internal static class QueryStringHelper {
+	private static readonly char[] s_delimiter = { '=' };
+	private static readonly QueryString s_almostEmpty = new("?");
 
-            if(queryString == QueryString.Empty || queryString == s_almostEmpty)
-            {
-                return state;
-            }
+	public static Dictionary<string, StringValues> ParseQueryString(QueryString queryString) {
+		var state = new Dictionary<string, StringValues>();
 
-            var qs = queryString.Value;
+		if (queryString == QueryString.Empty || queryString == s_almostEmpty) {
+			return state;
+		}
 
-            if(qs[0] == '?')
-            {
-                qs = qs.Substring(1);
-            }
+		var qs = queryString.Value!;
 
-            foreach(var pair in qs.Split('&'))
-            {
-                var parts = pair.Split(s_delimiter, 2);
-                var key = Uri.UnescapeDataString(parts[0].Replace('+', ' '));
+		if (qs[0] == '?') {
+			qs = qs.Substring(1);
+		}
 
-                state.TryGetValue(key, out var values);
+		foreach (var pair in qs.Split('&')) {
+			var parts = pair.Split(s_delimiter, 2);
+			var key = Uri.UnescapeDataString(parts[0].Replace('+', ' '));
 
-                if(parts.Length == 1)
-                {
-                    state[key] = values;
-                }
-                else
-                {
-                    var value = Uri.UnescapeDataString(parts[1].Replace('+', ' '));
+			state.TryGetValue(key, out var values);
 
-                    state[key] = StringValues.Concat(value, values);
-                }
-            }
+			if (parts.Length == 1) {
+				state[key] = values;
+			} else {
+				var value = Uri.UnescapeDataString(parts[1].Replace('+', ' '));
 
-            return state;
-        }
-    }
+				state[key] = StringValues.Concat(value, values);
+			}
+		}
+
+		return state;
+	}
 }

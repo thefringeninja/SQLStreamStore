@@ -1,24 +1,19 @@
-namespace SqlStreamStore.HAL
-{
-    using Halcyon.HAL;
-    using Newtonsoft.Json.Linq;
+namespace SqlStreamStore.HAL;
 
-    internal class StreamMessageHALResponse : HALResponse
-    {
-        public StreamMessageHALResponse(SqlStreamStore.Streams.StreamMessage message, string payload)
-            : base(new
-            {
-                message.MessageId,
-                message.CreatedUtc,
-                message.Position,
-                message.StreamId,
-                message.StreamVersion,
-                message.Type,
-                payload = FromString(payload),
-                metadata = FromString(message.JsonMetadata)
-            })
-        { }
+using System.Text.Json.Nodes;
 
-        private static JObject FromString(string data) => string.IsNullOrEmpty(data) ? default : JObject.Parse(data);
-    }
+internal class StreamMessageHALResponse : HALResponse {
+	public StreamMessageHALResponse(SqlStreamStore.Streams.StreamMessage message, string? payload)
+		: base(new {
+			message.MessageId,
+			message.CreatedUtc,
+			message.Position,
+			message.StreamId,
+			message.StreamVersion,
+			message.Type,
+			payload = FromString(payload),
+			metadata = FromString(message.JsonMetadata)
+		}) { }
+
+	private static JsonNode? FromString(string? data) => string.IsNullOrEmpty(data) ? null : JsonNode.Parse(data);
 }

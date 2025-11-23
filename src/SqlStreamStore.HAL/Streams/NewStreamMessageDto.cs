@@ -1,17 +1,14 @@
-﻿namespace SqlStreamStore.HAL.Streams
-{
-    using System;
-    using Newtonsoft.Json.Linq;
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore.HAL.Streams;
 
-    internal class NewStreamMessageDto
-    {
-        public Guid MessageId { get; set; }
-        public string Type { get; set; }
-        public JObject JsonData { get; set; }
-        public JObject JsonMetadata { get; set; }
+using System;
+using System.Text.Json.Nodes;
+using SqlStreamStore.Streams;
 
-        public NewStreamMessage ToNewStreamMessage()
-            => new NewStreamMessage(MessageId, Type, JsonData.ToString(), JsonMetadata?.ToString());
-    }
+internal class NewStreamMessageDto {
+	public required Guid MessageId { get; set; }
+	public required string Type { get; set; }
+	public required JsonObject JsonData { get; set; }
+	public JsonObject? JsonMetadata { get; set; }
+
+	public NewStreamMessage ToNewStreamMessage() => new(MessageId, Type, JsonData.ToString(), JsonMetadata?.ToString());
 }

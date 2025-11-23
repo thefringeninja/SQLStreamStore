@@ -1,57 +1,53 @@
-namespace SqlStreamStore
-{
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Imports.Ensure.That;
-    using SqlStreamStore.Internal.HoneyBearHalClient;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    partial class HttpClientSqlStreamStore
-    {
-        public Task<ListStreamsPage> ListStreams(
-            int maxCount = 100,
-            string continuationToken = default,
-            CancellationToken cancellationToken = default)
-        {
-            Ensure.That(maxCount).IsGt(0);
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+using SqlStreamStore.Streams;
 
-            return ListStreams(Pattern.Anything(), maxCount, continuationToken, cancellationToken);
-        }
+partial class HttpClientSqlStreamStore {
+	public Task<ListStreamsPage> ListStreams(
+		int maxCount = 100,
+		string? continuationToken = default,
+		CancellationToken cancellationToken = default) {
+		ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxCount, 0);
 
-        public async Task<ListStreamsPage> ListStreams(
-            Pattern pattern,
-            int maxCount = 100,
-            string continuationToken = default,
-            CancellationToken cancellationToken = default)
-        {
-            Ensure.That(maxCount).IsGt(0);
+		return ListStreams(Pattern.Anything(), maxCount, continuationToken, cancellationToken);
+	}
 
-            GuardAgainstDisposed();
+	public async Task<ListStreamsPage> ListStreams(
+		Pattern pattern,
+		int maxCount = 100,
+		string? continuationToken = default,
+		CancellationToken cancellationToken = default) {
+		ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxCount, 0);
 
-            Task<ListStreamsPage> ListNext(string @continue, CancellationToken ct)
-                => ListStreams(pattern, maxCount, @continue, ct);
+		GuardAgainstDisposed();
 
-            var client = CreateClient();
+		Task<ListStreamsPage> ListNext(string? @continue, CancellationToken ct)
+			=> ListStreams(pattern, maxCount, @continue, ct);
 
-            client = await client.RootAsync(
-                continuationToken == default
-                    ? LinkFormatter.ListStreams(pattern, maxCount)
-                    : LinkFormatter.ListStreams(pattern, maxCount, continuationToken),
-                cancellationToken);
+		var client = CreateClient();
 
-            var resource = client.Current.First();
+		client = await client.RootAsync(
+			continuationToken == default
+				? LinkFormatter.ListStreams(pattern, maxCount)
+				: LinkFormatter.ListStreams(pattern, maxCount, continuationToken),
+			cancellationToken);
 
-            var streamIds = from e in resource.Embedded
-                where e.Rel == Constants.Relations.Feed
-                from link in e.Links
-                where link.Rel == Constants.Relations.Feed
-                select link.Title;
+		var resource = client.Current.First();
 
-            var listStreams = resource.Data<HalListStreams>();
+		var streamIds = from e in resource.Embedded
+			where e.Rel == Constants.Relations.Feed
+			from link in e.Links
+			where link.Rel == Constants.Relations.Feed
+			select link.Title;
 
-            return new ListStreamsPage(listStreams.ContinuationToken, streamIds.ToArray(), ListNext);
-        }
-    }
+		var listStreams = resource.Data<HalListStreams>();
+
+		return new ListStreamsPage(listStreams.ContinuationToken, streamIds.ToArray(), ListNext);
+	}
 }

@@ -1,25 +1,22 @@
-﻿namespace SqlStreamStore
-{
-    using System.Diagnostics;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Streams;
-    using Xunit;
+﻿namespace SqlStreamStore;
 
-    public partial class AcceptanceTests
-    {
-        [Fact]
-        public async Task Time_to_take_to_read_1000_read_head_positions()
-        {
-            await Store.AppendToStream("stream-1", ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+using System.Diagnostics;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.Streams;
+using Xunit;
 
-            var stopwatch = Stopwatch.StartNew();
+public partial class AcceptanceTests {
+	[Fact]
+	public async Task Time_to_take_to_read_1000_read_head_positions() {
+		await Store.AppendToStream("stream-1", ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
 
-            for(int i = 0; i < 1000; i++)
-            {
-                await Store.ReadHeadPosition();
-            }
+		var stopwatch = Stopwatch.StartNew();
 
-            TestOutputHelper.WriteLine(stopwatch.ElapsedMilliseconds.ToString());
-        }
-    }
+		for (int i = 0; i < 1000; i++) {
+			await Store.ReadHeadPosition();
+		}
+
+		Logger.LogInformation("{elapsed}", stopwatch.ElapsedMilliseconds);
+	}
 }
