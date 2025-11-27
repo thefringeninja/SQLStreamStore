@@ -20,6 +20,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: checkout
         uses: actions/checkout@v6
+        with: 
+          fetch-tags: true
       - name: build
         shell: bash
         run: dotnet build --configuration Release
@@ -32,6 +34,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: checkout
         uses: actions/checkout@v6
+        with:
+          fetch-tags: true
       - name: test
         shell: bash
         run: dotnet test --configuration Release tests/SqlStreamStore.Tests --logger GitHubActions
@@ -50,6 +54,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: checkout
         uses: actions/checkout@v6
+        with:
+          fetch-tags: true
       - name: test
         shell: bash
         run: dotnet test --configuration Release tests/SqlStreamStore.${{ matrix.test }}.Tests  --logger GitHubActions
@@ -66,6 +72,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: checkout
         uses: actions/checkout@v6
+        with:
+          fetch-tags: true
       - name: cover
         shell: bash
         run: |
@@ -105,6 +113,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: checkout
         uses: actions/checkout@v6
+        with:
+          fetch-tags: true
       - name: pack
         shell: bash
         run: dotnet pack --configuration Release --output publish
