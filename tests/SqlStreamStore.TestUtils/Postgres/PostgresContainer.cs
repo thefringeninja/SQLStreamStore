@@ -47,7 +47,7 @@ public class PostgresContainer : PostgresDatabaseManager {
 
 	private NpgsqlConnectionStringBuilder ConnectionStringBuilder => new() {
 		Database = DatabaseName,
-		Password = Environment.OSVersion.IsWindows()
+		Password = OperatingSystem.IsWindows()
 			? "password"
 			: null,
 		Port = Port,
