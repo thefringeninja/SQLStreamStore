@@ -9,16 +9,10 @@
         <NullableContextOptions>enable</NullableContextOptions>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <MinVerTagPrefix>v</MinVerTagPrefix>
-        <MinVerMinimumMajorMinor>2.0</MinVerMinimumMajorMinor>
         <Deterministic>true</Deterministic>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All"/>
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All"/>
     </ItemGroup>
-    <Target Name="Adjust_Version_1_Releases_AssemblyVersion" AfterTargets="MinVer" Condition="'$(MinVerMajor)' == '1'">
-        <PropertyGroup>
-            <AssemblyVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch).0</AssemblyVersion>
-        </PropertyGroup>
-    </Target>
 </Project>
