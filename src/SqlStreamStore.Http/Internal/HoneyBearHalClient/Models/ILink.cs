@@ -1,13 +1,11 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Models
-{
-    using Newtonsoft.Json;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-    internal interface ILink : INode
-    {
-        [JsonProperty("templated", DefaultValueHandling = DefaultValueHandling.Ignore)]
-        bool Templated { get; set; }
+using System.Text.Json.Serialization;
 
-        [JsonProperty("title")]
-        string Title { get; set; }
-    }
+internal interface ILink : INode {
+	[JsonPropertyName("templated")]
+	bool Templated { get; set; }
+
+	[JsonPropertyName("title")]
+	string? Title { get; set; }
 }

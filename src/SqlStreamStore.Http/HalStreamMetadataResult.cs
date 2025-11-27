@@ -1,23 +1,20 @@
-﻿namespace SqlStreamStore
-{
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore;
 
-    internal class HalStreamMetadataResult
-    {
-        public int MetadataStreamVersion { get; set; }
-        public string StreamId { get; set; }
-        public JObject MetadataJson { get; set; }
-        public int? MaxCount { get; set; }
-        public int? MaxAge { get; set; }
+using System.Text.Json.Nodes;
+using SqlStreamStore.Streams;
 
-        public static implicit operator StreamMetadataResult(HalStreamMetadataResult result)
-            => new StreamMetadataResult(
-                result.StreamId,
-                result.MetadataStreamVersion,
-                result.MaxAge,
-                result.MaxCount,
-                result.MetadataJson?.ToString(Formatting.Indented));
-    }
+internal class HalStreamMetadataResult {
+	public int MetadataStreamVersion { get; set; }
+	public required string StreamId { get; set; }
+	public JsonObject? MetadataJson { get; set; }
+	public int? MaxCount { get; set; }
+	public int? MaxAge { get; set; }
+
+	public static implicit operator StreamMetadataResult(HalStreamMetadataResult result)
+		=> new(
+			result.StreamId,
+			result.MetadataStreamVersion,
+			result.MaxAge,
+			result.MaxCount,
+			result.MetadataJson?.ToString());
 }

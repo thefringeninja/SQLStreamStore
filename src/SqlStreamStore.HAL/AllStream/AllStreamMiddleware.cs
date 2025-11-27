@@ -1,31 +1,28 @@
-namespace SqlStreamStore.HAL.AllStream
-{
-    using System.Net.Http;
-    using Microsoft.AspNetCore.Builder;
-    using MidFunc = System.Func<
-        Microsoft.AspNetCore.Http.HttpContext,
-        System.Func<System.Threading.Tasks.Task>,
-        System.Threading.Tasks.Task
-    >;
+namespace SqlStreamStore.HAL.AllStream;
 
-    internal static class AllStreamMiddleware
-    {
-        public static IApplicationBuilder UseAllStream(
-            this IApplicationBuilder app,
-            AllStreamResource allStream) => app
-            .UseMiddlewareLogging(typeof(AllStreamMiddleware))
-            .MapWhen(
-                HttpMethod.Get,
-                inner => inner.UseAccept(Constants.MediaTypes.HalJson).Use(GetStream(allStream)))
-            .UseAllowedMethods(allStream);
+using System.Net.Http;
+using Microsoft.AspNetCore.Builder;
+using MidFunc = System.Func<
+	Microsoft.AspNetCore.Http.HttpContext,
+	System.Func<System.Threading.Tasks.Task>,
+	System.Threading.Tasks.Task
+>;
 
-        private static MidFunc GetStream(AllStreamResource allStream) => async (context, next) =>
-        {
-            var operation = new ReadAllStreamOperation(context);
+internal static class AllStreamMiddleware {
+	public static IApplicationBuilder UseAllStream(
+		this IApplicationBuilder app,
+		AllStreamResource allStream) => app
+		.UseMiddlewareLogging(typeof(AllStreamMiddleware))
+		.MapWhen(
+			HttpMethod.Get,
+			inner => inner.UseAccept(Constants.MediaTypes.HalJson).Use(GetStream(allStream)))
+		.UseAllowedMethods(allStream);
 
-            var response = await allStream.Get(operation, context.RequestAborted);
+	private static MidFunc GetStream(AllStreamResource allStream) => async (context, next) => {
+		var operation = new ReadAllStreamOperation(context);
 
-            await context.WriteResponse(response);
-        };
-    }
+		var response = await allStream.Get(operation, context.RequestAborted);
+
+		await context.WriteResponse(response);
+	};
 }

@@ -1,58 +1,38 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Concurrent;
-    using System.Threading.Tasks;
-    using SqlStreamStore.TestUtils.MsSql;
-    using Xunit;
-    using Xunit.Abstractions;
+﻿namespace SqlStreamStore;
 
-    public class MsSqlStreamStoreV3FixturePool : IAsyncLifetime
-    {
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<MsSqlStreamStoreV3Fixture>> _fixturePoolBySchema
-            = new ConcurrentDictionary<string, ConcurrentQueue<MsSqlStreamStoreV3Fixture>>();
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.TestUtils.MsSql;
+using Xunit;
 
-        public async Task<MsSqlStreamStoreV3Fixture> Get(
-            ITestOutputHelper outputHelper,
-            string schema = "dbo")
-        {
-            var fixturePool = _fixturePoolBySchema.GetOrAdd(
-                schema,
-                _ => new ConcurrentQueue<MsSqlStreamStoreV3Fixture>());
+public class MsSqlStreamStoreV3FixturePool : IAsyncLifetime, IDisposable {
+	private readonly SqlServerContainer _dockerInstance = new(SqlServerContainer.DefaultHostPortStart + 500);
 
-            if (!fixturePool.TryDequeue(out var fixture))
-            {
-                var databaseName = $"sss-v3-{Guid.NewGuid():N}";
-                var dockerInstance = new SqlServerContainer(databaseName);
-                await dockerInstance.Start();
-                await dockerInstance.CreateDatabase();
+	public async Task<MsSqlStreamStoreV3Fixture> Get(
+		ILoggerFactory loggerFactory,
+		string schema = "dbo") {
+		var databaseName = $"sss-v3-{Guid.NewGuid():N}";
+		await _dockerInstance.CreateDatabase(databaseName);
+		var fixture = new MsSqlStreamStoreV3Fixture(
+			schema,
+			_dockerInstance,
+			databaseName,
+			onDispose: () => {},
+			loggerFactory);
 
-                fixture = new MsSqlStreamStoreV3Fixture(
-                    schema,
-                    dockerInstance,
-                    databaseName,
-                    onDispose:() => fixturePool.Enqueue(fixture));
+		await fixture.Prepare();
 
-                outputHelper.WriteLine($"Using new fixture with db {databaseName}");
-            }
-            else
-            {
-                outputHelper.WriteLine($"Using pooled fixture with db {fixture.DatabaseName}");
-            }
+		return fixture;
+	}
 
-            await fixture.Prepare();
+	public async Task InitializeAsync() {
+		await _dockerInstance.Start();
+	}
 
-            return fixture;
-        }
+	Task IAsyncLifetime.DisposeAsync() {
+		return Task.CompletedTask;
+	}
 
-        public Task InitializeAsync()
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task DisposeAsync()
-        {
-            return Task.CompletedTask;
-        }
-    }
+	public void Dispose() => _dockerInstance.Dispose();
 }

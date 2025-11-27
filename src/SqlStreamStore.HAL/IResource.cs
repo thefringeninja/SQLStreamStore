@@ -1,7 +1,5 @@
-﻿namespace SqlStreamStore.HAL
-{
-    internal interface IResource
-    {
-        SchemaSet Schema { get; }
-    }
+﻿namespace SqlStreamStore.HAL;
+
+internal interface IResource {
+	SchemaSet? Schema { get; }
 }

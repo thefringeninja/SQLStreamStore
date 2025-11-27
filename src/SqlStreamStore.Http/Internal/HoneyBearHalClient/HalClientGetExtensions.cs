@@ -1,44 +1,40 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient
-{
-    using System.Linq;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient;
 
-    internal static class HalClientGetExtensions
-    {
-        public static Task<IHalClient> GetAsync(this IHalClient client, IResource resource, string rel) =>
-            client.GetAsync(resource, rel, null, null);
+using System.Linq;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-        public static Task<IHalClient> GetAsync(
-            this IHalClient client,
-            IResource resource,
-            string rel,
-            object parameters) =>
-            client.GetAsync(resource, rel, parameters, null);
+internal static class HalClientGetExtensions {
+	public static Task<IHalClient> GetAsync(this IHalClient client, IResource resource, string rel) =>
+		client.GetAsync(resource, rel, null, null);
 
-        public static async Task<IHalClient> GetAsync(
-            this IHalClient client,
-            IResource resource,
-            string rel,
-            object parameters,
-            string curie)
-        {
-            var relationship = HalClientExtensions.Relationship(rel, curie);
+	public static Task<IHalClient> GetAsync(
+		this IHalClient client,
+		IResource resource,
+		string rel,
+		object parameters) =>
+		client.GetAsync(resource, rel, parameters, null);
 
-            if(resource.Embedded.Any(e => e.Rel == relationship))
-            {
-                var current = resource.Embedded.Where(e => e.Rel == relationship);
+	public static async Task<IHalClient> GetAsync(
+		this IHalClient client,
+		IResource resource,
+		string rel,
+		object? parameters,
+		string? curie) {
+		var relationship = HalClientExtensions.Relationship(rel, curie);
 
-                return new HalClient(client, current);
-            }
+		if (resource.Embedded.Any(e => e.Rel == relationship)) {
+			var current = resource.Embedded.Where(e => e.Rel == relationship);
 
-            var link = resource.Links.FirstOrDefault(l => l.Rel == relationship);
-            if(link == null)
-                throw new FailedToResolveRelationship(relationship);
+			return new HalClient(client, current);
+		}
 
-            return await client.ExecuteAsync(
-                HalClientExtensions.Construct(resource.BaseAddress, link, parameters),
-                uri => client.Client.GetAsync(uri));
-        }
-    }
+		var link = resource.Links.FirstOrDefault(l => l.Rel == relationship);
+		if (link == null)
+			throw new FailedToResolveRelationship(relationship);
+
+		return await client.ExecuteAsync(
+			HalClientExtensions.Construct(resource.BaseAddress, link, parameters),
+			uri => client.Client.GetAsync(uri));
+	}
 }

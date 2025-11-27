@@ -1,13 +1,11 @@
-﻿namespace SqlStreamStore
-{
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore;
 
-    internal class HalAppendResult
-    {
-        public int CurrentVersion { get; set; }
-        public long CurrentPosition { get; set; }
+using SqlStreamStore.Streams;
 
-        public static implicit operator AppendResult(HalAppendResult result)
-            => new AppendResult(result.CurrentVersion, result.CurrentPosition);
-    }
+internal class HalAppendResult {
+	public int CurrentVersion { get; set; }
+	public long CurrentPosition { get; set; }
+
+	public static implicit operator AppendResult(HalAppendResult result)
+		=> new(result.CurrentVersion, result.CurrentPosition);
 }

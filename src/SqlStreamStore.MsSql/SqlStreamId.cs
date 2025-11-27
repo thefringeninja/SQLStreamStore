@@ -1,16 +1,13 @@
-namespace SqlStreamStore
-{
-    internal struct SqlStreamId
-    {
-        internal readonly string Id;
-        internal readonly string IdOriginal;
+namespace SqlStreamStore;
 
-        public SqlStreamId(string id, string idOriginal)
-        {
-            Id = id;
-            IdOriginal = idOriginal;
-        }
+internal struct SqlStreamId {
+	internal readonly string Id;
+	internal readonly string IdOriginal;
 
-        internal static readonly SqlStreamId Deleted = new StreamIdInfo(Streams.Deleted.DeletedStreamId).SqlStreamId;
-    }
+	public SqlStreamId(string id, string idOriginal) {
+		Id = id;
+		IdOriginal = idOriginal;
+	}
+
+	internal static readonly SqlStreamId Deleted = new StreamIdInfo(Streams.Deleted.DeletedStreamId).SqlStreamId;
 }

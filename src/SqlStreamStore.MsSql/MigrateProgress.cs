@@ -1,38 +1,34 @@
-﻿namespace SqlStreamStore
-{
-    public class MigrateProgress
-    {
-        public enum MigrateStage
-        {
-            /// <summary>
-            /// Schema version have been checked.
-            /// </summary>
-            SchemaVersionChecked  = 0,
+﻿namespace SqlStreamStore;
 
-            /// <summary>
-            /// Schema has been migrated
-            /// </summary>
-            SchemaMigrated = 1,
+public class MigrateProgress {
+	public enum MigrateStage {
+		/// <summary>
+		/// Schema version have been checked.
+		/// </summary>
+		SchemaVersionChecked = 0,
 
-            /// <summary>
-            /// StreamIds loaded
-            /// </summary>
-            StreamIdsLoaded = 2,
+		/// <summary>
+		/// Schema has been migrated
+		/// </summary>
+		SchemaMigrated = 1,
 
-            /// <summary>
-            /// Metadata migrated.
-            /// </summary>
-            MetadataMigrated = 3,
-        }
-    
-        /// <summary>
-        ///     The stage 
-        /// </summary>
-        public MigrateStage Stage { get; }
+		/// <summary>
+		/// StreamIds loaded
+		/// </summary>
+		StreamIdsLoaded = 2,
 
-        internal MigrateProgress(MigrateStage stage)
-        {
-            Stage = stage;
-        }
-    }
+		/// <summary>
+		/// Metadata migrated.
+		/// </summary>
+		MetadataMigrated = 3,
+	}
+
+	/// <summary>
+	///     The stage 
+	/// </summary>
+	public MigrateStage Stage { get; }
+
+	internal MigrateProgress(MigrateStage stage) {
+		Stage = stage;
+	}
 }

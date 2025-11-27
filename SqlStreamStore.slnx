@@ -1,0 +1,30 @@
+<Solution>
+	<Project Path=".github/.github.shproj" />
+	<Folder Name="/src/">
+		<File Path="src/Directory.Build.props" />
+		<Project Path="src/SqlStreamStore.HAL.DevServer/SqlStreamStore.HAL.DevServer.csproj" />
+		<Project Path="src/SqlStreamStore.HAL/SqlStreamStore.HAL.csproj" />
+		<Project Path="src/SqlStreamStore.Http/SqlStreamStore.Http.csproj" />
+		<Project Path="src/SqlStreamStore.MsSql/SqlStreamStore.MsSql.csproj" />
+		<Project Path="src/SqlStreamStore.MySql/SqlStreamStore.MySql.csproj" />
+		<Project Path="src/SqlStreamStore.Postgres/SqlStreamStore.Postgres.csproj" />
+		<Project Path="src/SqlStreamStore.Sqlite/SqlStreamStore.Sqlite.csproj" />
+		<Project Path="src/SqlStreamStore/SqlStreamStore.csproj" />
+	</Folder>
+	<Folder Name="/tests/">
+		<File Path="tests/Directory.Build.props" />
+		<Project Path="tests/SqlStreamStore.HAL.Tests/SqlStreamStore.HAL.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.Http.Tests/SqlStreamStore.Http.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.MsSql.Tests/SqlStreamStore.MsSql.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.MsSql.V3.Tests/SqlStreamStore.MsSql.V3.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.MySql.Tests/SqlStreamStore.MySql.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.Postgres.Tests/SqlStreamStore.Postgres.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.Sqlite.Tests/SqlStreamStore.Sqlite.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.Tests/SqlStreamStore.Tests.csproj" />
+		<Project Path="tests/SqlStreamStore.TestUtils/SqlStreamStore.TestUtils.csproj" />
+	</Folder>
+	<Folder Name="/tools/">
+		<Project Path="tools/LoadTests/LoadTests.csproj" />
+		<Project Path="tools/SqlStreamStore.SchemaCreationScriptTool/SqlStreamStore.SchemaCreationScriptTool.csproj" />
+	</Folder>
+</Solution>

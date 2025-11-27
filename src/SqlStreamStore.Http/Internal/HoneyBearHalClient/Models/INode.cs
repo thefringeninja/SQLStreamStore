@@ -1,16 +1,14 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Models
-{
-    using Newtonsoft.Json;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-    internal interface INode
-    {
-        [JsonIgnore]
-        string Rel { get; set; }
+using System.Text.Json.Serialization;
 
-        [JsonProperty("href")]
-        string Href { get; set; }
+internal interface INode {
+	[JsonIgnore]
+	string? Rel { get; set; }
 
-        [JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)]
-        string Name { get; set; }
-    }
+	[JsonPropertyName("href")]
+	string? Href { get; set; }
+
+	[JsonPropertyName("name")]
+	string? Name { get; set; }
 }

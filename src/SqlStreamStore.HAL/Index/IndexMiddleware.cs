@@ -1,30 +1,27 @@
-namespace SqlStreamStore.HAL.Index
-{
-    using System;
-    using System.Net.Http;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Builder;
-    using Microsoft.AspNetCore.Http;
-    using MidFunc = System.Func<
-        Microsoft.AspNetCore.Http.HttpContext,
-        System.Func<System.Threading.Tasks.Task>,
-        System.Threading.Tasks.Task
-    >;
+namespace SqlStreamStore.HAL.Index;
 
-    internal static class IndexMiddleware
-    {
-        public static IApplicationBuilder UseIndex(this IApplicationBuilder app, IndexResource index)
-            => app.UseMiddlewareLogging(typeof(IndexMiddleware))
-                .MapWhen(HttpMethod.Get, inner => inner.UseAccept(Constants.MediaTypes.HalJson).Use(Index(index)))
-                .UseAllowedMethods(index);
+using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using MidFunc = System.Func<
+	Microsoft.AspNetCore.Http.HttpContext,
+	System.Func<System.Threading.Tasks.Task>,
+	System.Threading.Tasks.Task
+>;
 
-        private static MidFunc Index(IndexResource index)
-        {
-            var response = index.Get();
+internal static class IndexMiddleware {
+	public static IApplicationBuilder UseIndex(this IApplicationBuilder app, IndexResource index)
+		=> app.UseMiddlewareLogging(typeof(IndexMiddleware))
+			.MapWhen(HttpMethod.Get, inner => inner.UseAccept(Constants.MediaTypes.HalJson).Use(Index(index)))
+			.UseAllowedMethods(index);
 
-            Task Index(HttpContext context, Func<Task> next) => context.WriteResponse(response);
+	private static MidFunc Index(IndexResource index) {
+		var response = index.Get();
 
-            return Index;
-        }
-    }
+		Task Index(HttpContext context, Func<Task> next) => context.WriteResponse(response);
+
+		return Index;
+	}
 }

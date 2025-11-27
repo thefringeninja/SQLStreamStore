@@ -1,52 +1,46 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Concurrent;
-    using System.Threading.Tasks;
-    using SqlStreamStore.TestUtils.MySql;
-    using Xunit;
-    using Xunit.Abstractions;
+﻿namespace SqlStreamStore;
 
-    public class MySqlStreamStoreFixturePool : IAsyncLifetime
-    {
-        private readonly ConcurrentQueue<MySqlStreamStoreFixture> _fixturePool
-            = new ConcurrentQueue<MySqlStreamStoreFixture>();
+using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.TestUtils.MySql;
+using Xunit;
 
-        public async Task<MySqlStreamStoreFixture> Get(ITestOutputHelper outputHelper)
-        {
-            if (!_fixturePool.TryDequeue(out var fixture))
-            {
-                var dbUniqueName = (DateTime.UtcNow - DateTime.UnixEpoch).TotalMilliseconds;
-                var databaseName = $"sss-v3-{dbUniqueName}";
-                var dockerInstance = new MySqlContainer(databaseName);
-                await dockerInstance.Start();
-                await dockerInstance.CreateDatabase();
+public class MySqlStreamStoreFixturePool : IAsyncLifetime {
+	private readonly ConcurrentQueue<MySqlStreamStoreFixture> _fixturePool = new();
 
-                fixture = new MySqlStreamStoreFixture(
-                    dockerInstance,
-                    databaseName,
-                    onDispose:() => _fixturePool.Enqueue(fixture));
+	public async Task<MySqlStreamStoreFixture> Get(ILoggerFactory loggerFactory) {
+		var logger = loggerFactory.CreateLogger<MySqlStreamStoreFixturePool>();
 
-                outputHelper.WriteLine($"Using new fixture with db {databaseName}");
-            }
-            else
-            {
-                outputHelper.WriteLine($"Using pooled fixture with db {fixture.DatabaseName}");
-            }
+		if (!_fixturePool.TryDequeue(out var fixture)) {
+			var dbUniqueName = (DateTime.UtcNow - DateTime.UnixEpoch).TotalMilliseconds;
+			var databaseName = $"sss-v3-{dbUniqueName}";
+			var dockerInstance = new MySqlContainer(databaseName);
+			await dockerInstance.Start();
+			await dockerInstance.CreateDatabase();
 
-            await fixture.Prepare();
+			fixture = new MySqlStreamStoreFixture(
+				dockerInstance,
+				databaseName,
+				onDispose: () => _fixturePool.Enqueue(fixture!),
+				loggerFactory);
 
-            return fixture;
-        }
+			logger.LogInformation("Using new fixture with db {DatabaseName}", databaseName);
+		} else {
+			logger.LogInformation("Using pooled fixture with db {FixtureDatabaseName}", fixture.DatabaseName);
+		}
 
-        public Task InitializeAsync()
-        {
-            return Task.CompletedTask;
-        }
+		await fixture.Prepare();
 
-        public Task DisposeAsync()
-        {
-            return Task.CompletedTask;
-        }
-    }
+		return fixture;
+	}
+
+	public Task InitializeAsync() {
+		return Task.CompletedTask;
+	}
+
+	public Task DisposeAsync() {
+		return Task.CompletedTask;
+	}
 }

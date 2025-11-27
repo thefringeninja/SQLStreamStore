@@ -1,30 +1,26 @@
-namespace SqlStreamStore.HAL.StreamMessage.MessageId
-{
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.AspNetCore.Routing;
+namespace SqlStreamStore.HAL.StreamMessage.MessageId;
 
-    internal class DeleteStreamMessageByMessageIdOperation : IStreamStoreOperation<Unit>
-    {
-        public DeleteStreamMessageByMessageIdOperation(HttpContext context)
-        {
-            Path = context.Request.Path;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
-            StreamId = context.GetRouteData().GetStreamId();
-            MessageId = context.GetRouteData().GetMessageId();
-        }
+internal class DeleteStreamMessageByMessageIdOperation : IStreamStoreOperation<Unit> {
+	public DeleteStreamMessageByMessageIdOperation(HttpContext context) {
+		Path = context.Request.Path;
 
-        public string StreamId { get; }
-        public Guid MessageId { get; }
-        public PathString Path { get; }
+		StreamId = context.GetRouteData().GetStreamId();
+		MessageId = context.GetRouteData().GetMessageId();
+	}
 
-        public async Task<Unit> Invoke(IStreamStore streamStore, CancellationToken ct)
-        {
-            await streamStore.DeleteMessage(StreamId, MessageId, ct);
+	public string StreamId { get; }
+	public Guid MessageId { get; }
+	public PathString Path { get; }
 
-            return Unit.Instance;
-        }
-    }
+	public async Task<Unit> Invoke(IStreamStore streamStore, CancellationToken ct) {
+		await streamStore.DeleteMessage(StreamId, MessageId, ct);
+
+		return Unit.Instance;
+	}
 }

@@ -1,57 +1,50 @@
-namespace SqlStreamStore.HAL.Index
-{
-    using System;
-    using System.Linq;
-    using System.Reflection;
-    using Halcyon.HAL;
-    using Microsoft.AspNetCore.Http;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
+namespace SqlStreamStore.HAL.Index;
 
-    internal class IndexResource : IResource
-    {
-        public SchemaSet Schema { get; }
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Microsoft.AspNetCore.Http;
 
-        private readonly JObject _data;
+internal class IndexResource : IResource {
+	public SchemaSet? Schema { get; }
 
-        public IndexResource(IStreamStore streamStore, Assembly serverAssembly)
-        {
-            var streamStoreType = streamStore.GetType();
-            var streamStoreTypeName = streamStoreType.Name;
-            var versions = JObject.FromObject(new
-            {
-                streamStore = GetVersion(streamStoreType)
-            });
-            versions[serverAssembly?.GetName().Name?.Split('.').LastOrDefault() ?? "Server"] =
-                GetVersion(serverAssembly);
+	private readonly object _data;
 
-            _data = JObject.FromObject(new
-            {
-                provider = streamStoreTypeName.Substring(0, streamStoreTypeName.Length - "StreamStore".Length),
-                versions
-            });
-        }
+	public IndexResource(IStreamStore streamStore, Assembly? serverAssembly) {
+		var streamStoreType = streamStore.GetType();
+		var streamStoreTypeName = streamStoreType.Name;
+		var versions = new Dictionary<string, string> {
+			["streamStore"] = GetVersion(streamStoreType),
+			[serverAssembly?.GetName().Name?.Split('.').LastOrDefault() ?? "Server"] =
+				GetVersion(serverAssembly)
+		};
 
-        private static string GetVersion(Type type) => GetVersion(type.Assembly);
+		_data = new {
+			provider = streamStoreTypeName.Substring(0, streamStoreTypeName.Length - "StreamStore".Length),
+			versions
+		};
+	}
 
-        private static string GetVersion(Assembly assembly)
-            => assembly
-                   ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                   ?.InformationalVersion
-               ?? assembly
-                   ?.GetCustomAttribute<AssemblyVersionAttribute>()
-                   ?.Version
-               ?? "unknown";
+	private static string GetVersion(Type type) => GetVersion(type.Assembly);
 
-        public Response Get() => new HalJsonResponse(new HALResponse(_data)
-            .AddLinks(
-                Links
-                    .FromPath(PathString.Empty)
-                    .Index().Self()
-                    .Find()
-                    .Browse()
-                    .Add(Constants.Relations.Feed, LinkFormatter.AllStream())));
+	private static string GetVersion(Assembly? assembly)
+		=> assembly
+			   ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+			   ?.InformationalVersion
+		   ?? assembly
+			   ?.GetCustomAttribute<AssemblyVersionAttribute>()
+			   ?.Version
+		   ?? "unknown";
 
-        public override string ToString() => _data.ToString(Formatting.None);
-    }
+	public Response Get() => new HalJsonResponse(new HALResponse(_data)
+		.AddLinks(
+			Links
+				.FromPath(PathString.Empty)
+				.Index().Self()
+				.Find()
+				.Browse()
+				.Add(Constants.Relations.Feed, LinkFormatter.AllStream())));
+
+	public override string? ToString() => _data.ToString();
 }

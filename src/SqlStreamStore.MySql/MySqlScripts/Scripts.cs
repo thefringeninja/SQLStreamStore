@@ -1,133 +1,126 @@
-﻿namespace SqlStreamStore.MySqlScripts
-{
-    using System;
-    using System.Collections.Concurrent;
-    using System.IO;
-    using System.Reflection;
+﻿namespace SqlStreamStore.MySqlScripts;
 
-    internal class Scripts
-    {
-        private static readonly Assembly s_assembly = typeof(Scripts)
-            .GetTypeInfo()
-            .Assembly;
+using System;
+using System.Collections.Concurrent;
+using System.IO;
+using System.Reflection;
 
-        private readonly ConcurrentDictionary<string, string> _scripts
-            = new ConcurrentDictionary<string, string>();
+internal class Scripts {
+	private static readonly Assembly s_assembly = typeof(Scripts)
+		.GetTypeInfo()
+		.Assembly;
 
-        public string DropAll => GetScript(nameof(DropAll));
+	private readonly ConcurrentDictionary<string, string> _scripts = new();
 
-        private string Tables => GetScript(nameof(Tables));
+	public string DropAll => GetScript(nameof(DropAll));
 
-        private string AppendToStreamExpectedVersion => GetScript(nameof(AppendToStreamExpectedVersion));
+	private string Tables => GetScript(nameof(Tables));
 
-        private string AppendToStreamExpectedVersionAny => GetScript(nameof(AppendToStreamExpectedVersionAny));
+	private string AppendToStreamExpectedVersion => GetScript(nameof(AppendToStreamExpectedVersion));
 
-        private string AppendToStreamExpectedVersionEmptyStream =>
-            GetScript(nameof(AppendToStreamExpectedVersionEmptyStream));
+	private string AppendToStreamExpectedVersionAny => GetScript(nameof(AppendToStreamExpectedVersionAny));
 
-        private string AppendToStreamExpectedVersionNoStream =>
-            GetScript(nameof(AppendToStreamExpectedVersionNoStream));
+	private string AppendToStreamExpectedVersionEmptyStream =>
+		GetScript(nameof(AppendToStreamExpectedVersionEmptyStream));
 
-        private string CreateEmptyStream => GetScript(nameof(CreateEmptyStream));
+	private string AppendToStreamExpectedVersionNoStream =>
+		GetScript(nameof(AppendToStreamExpectedVersionNoStream));
 
-        private string DeleteStream => GetScript(nameof(DeleteStream));
+	private string CreateEmptyStream => GetScript(nameof(CreateEmptyStream));
 
-        private string DeleteStreamMessage => GetScript(nameof(DeleteStreamMessage));
+	private string DeleteStream => GetScript(nameof(DeleteStream));
 
-        private string GetStreamMetadata => GetScript(nameof(GetStreamMetadata));
+	private string DeleteStreamMessage => GetScript(nameof(DeleteStreamMessage));
 
-        private string ListStreams => GetScript(nameof(ListStreams));
+	private string GetStreamMetadata => GetScript(nameof(GetStreamMetadata));
 
-        private string ListStreamsStartingWith => GetScript(nameof(ListStreamsStartingWith));
+	private string ListStreams => GetScript(nameof(ListStreams));
 
-        private string ListStreamsEndingWith => GetScript(nameof(ListStreamsEndingWith));
+	private string ListStreamsStartingWith => GetScript(nameof(ListStreamsStartingWith));
 
-        private string ReadObsolete => GetScript(nameof(ReadObsolete));
+	private string ListStreamsEndingWith => GetScript(nameof(ListStreamsEndingWith));
 
-        private string ReadStreamForwards => GetScript(nameof(ReadStreamForwards));
+	private string ReadObsolete => GetScript(nameof(ReadObsolete));
 
-        private string ReadStreamForwardsWithData => GetScript(nameof(ReadStreamForwardsWithData));
+	private string ReadStreamForwards => GetScript(nameof(ReadStreamForwards));
 
-        private string ReadStreamBackwards => GetScript(nameof(ReadStreamBackwards));
+	private string ReadStreamForwardsWithData => GetScript(nameof(ReadStreamForwardsWithData));
 
-        private string ReadStreamBackwardsWithData => GetScript(nameof(ReadStreamBackwardsWithData));
+	private string ReadStreamBackwards => GetScript(nameof(ReadStreamBackwards));
 
-        private string ReadAllObsolete => GetScript(nameof(ReadAllObsolete));
+	private string ReadStreamBackwardsWithData => GetScript(nameof(ReadStreamBackwardsWithData));
 
-        private string ReadAllBackwards => GetScript(nameof(ReadAllBackwards));
+	private string ReadAllObsolete => GetScript(nameof(ReadAllObsolete));
 
-        private string ReadAllBackwardsWithData => GetScript(nameof(ReadAllBackwardsWithData));
+	private string ReadAllBackwards => GetScript(nameof(ReadAllBackwards));
 
-        private string ReadAllForwards => GetScript(nameof(ReadAllForwards));
+	private string ReadAllBackwardsWithData => GetScript(nameof(ReadAllBackwardsWithData));
 
-        private string ReadAllForwardsWithData => GetScript(nameof(ReadAllForwardsWithData));
+	private string ReadAllForwards => GetScript(nameof(ReadAllForwards));
+
+	private string ReadAllForwardsWithData => GetScript(nameof(ReadAllForwardsWithData));
 
 
-        private string ReadJsonData => GetScript(nameof(ReadJsonData));
+	private string ReadJsonData => GetScript(nameof(ReadJsonData));
 
-        private string ReadHeadPosition => GetScript(nameof(ReadHeadPosition));
+	private string ReadHeadPosition => GetScript(nameof(ReadHeadPosition));
 
-        private string ReadStreamHeadPosition => GetScript(nameof(ReadStreamHeadPosition));
+	private string ReadStreamHeadPosition => GetScript(nameof(ReadStreamHeadPosition));
 
-        private string ReadStreamHeadVersion => GetScript(nameof(ReadStreamHeadVersion));
+	private string ReadStreamHeadVersion => GetScript(nameof(ReadStreamHeadVersion));
 
-        private string ReadProperties => GetScript(nameof(ReadProperties));
+	private string ReadProperties => GetScript(nameof(ReadProperties));
 
-        private string ReadStreamVersionOfMessageId => GetScript(nameof(ReadStreamVersionOfMessageId));
+	private string ReadStreamVersionOfMessageId => GetScript(nameof(ReadStreamVersionOfMessageId));
 
-        private string Scavenge => GetScript(nameof(Scavenge));
+	private string Scavenge => GetScript(nameof(Scavenge));
 
-        private string SetStreamMetadata => GetScript(nameof(SetStreamMetadata));
+	private string SetStreamMetadata => GetScript(nameof(SetStreamMetadata));
 
 
-        public string CreateSchema => string.Join(
-            Environment.NewLine,
-            Tables,
-            AppendToStreamExpectedVersion,
-            AppendToStreamExpectedVersionAny,
-            AppendToStreamExpectedVersionEmptyStream,
-            AppendToStreamExpectedVersionNoStream,
-            CreateEmptyStream,
-            DeleteStream,
-            DeleteStreamMessage,
-            GetStreamMetadata,
-            ListStreams,
-            ListStreamsStartingWith,
-            ListStreamsEndingWith,
-            ReadObsolete,
-            ReadStreamForwards,
-            ReadStreamForwardsWithData,
-            ReadStreamBackwards,
-            ReadStreamBackwardsWithData,
-            ReadAllObsolete,
-            ReadAllBackwards,
-            ReadAllBackwardsWithData,
-            ReadAllForwards,
-            ReadAllForwardsWithData,
-            ReadJsonData,
-            ReadHeadPosition,
-            ReadStreamHeadPosition,
-            ReadStreamHeadVersion,
-            ReadProperties,
-            ReadStreamVersionOfMessageId,
-            Scavenge,
-            SetStreamMetadata);
+	public string CreateSchema => string.Join(
+		Environment.NewLine,
+		Tables,
+		AppendToStreamExpectedVersion,
+		AppendToStreamExpectedVersionAny,
+		AppendToStreamExpectedVersionEmptyStream,
+		AppendToStreamExpectedVersionNoStream,
+		CreateEmptyStream,
+		DeleteStream,
+		DeleteStreamMessage,
+		GetStreamMetadata,
+		ListStreams,
+		ListStreamsStartingWith,
+		ListStreamsEndingWith,
+		ReadObsolete,
+		ReadStreamForwards,
+		ReadStreamForwardsWithData,
+		ReadStreamBackwards,
+		ReadStreamBackwardsWithData,
+		ReadAllObsolete,
+		ReadAllBackwards,
+		ReadAllBackwardsWithData,
+		ReadAllForwards,
+		ReadAllForwardsWithData,
+		ReadJsonData,
+		ReadHeadPosition,
+		ReadStreamHeadPosition,
+		ReadStreamHeadVersion,
+		ReadProperties,
+		ReadStreamVersionOfMessageId,
+		Scavenge,
+		SetStreamMetadata);
 
-        private string GetScript(string name) => _scripts.GetOrAdd(name,
-            key =>
-            {
-                using(var stream = s_assembly.GetManifestResourceStream(typeof(Scripts), $"{key}.sql"))
-                {
-                    if(stream == null)
-                    {
-                        throw new Exception($"Embedded resource, {name}, not found. BUG!");
-                    }
+	private string GetScript(string name) => _scripts.GetOrAdd(name,
+		key => {
+			using (var stream = s_assembly.GetManifestResourceStream(typeof(Scripts), $"{key}.sql")) {
+				if (stream == null) {
+					throw new Exception($"Embedded resource, {name}, not found. BUG!");
+				}
 
-                    using(StreamReader reader = new StreamReader(stream))
-                    {
-                        return reader.ReadToEnd();
-                    }
-                }
-            });
-    }
+				using (StreamReader reader = new StreamReader(stream)) {
+					return reader.ReadToEnd();
+				}
+			}
+		});
 }

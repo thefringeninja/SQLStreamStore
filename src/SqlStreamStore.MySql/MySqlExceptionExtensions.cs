@@ -1,13 +1,11 @@
-namespace SqlStreamStore
-{
-    using MySqlConnector;
+namespace SqlStreamStore;
 
-    internal static class MySqlExceptionExtensions
-    {
-        public static bool IsWrongExpectedVersion(this MySqlException exception)
-            => exception.Message.Equals("WrongExpectedVersion") || exception.SqlState == "23000";
+using MySqlConnector;
 
-        public static bool IsDeadlock(this MySqlException exception)
-            => exception.Number == 1213;
-    }
+internal static class MySqlExceptionExtensions {
+	public static bool IsWrongExpectedVersion(this MySqlException exception)
+		=> exception.Message.Equals("WrongExpectedVersion") || exception.SqlState == "23000";
+
+	public static bool IsDeadlock(this MySqlException exception)
+		=> exception.Number == 1213;
 }

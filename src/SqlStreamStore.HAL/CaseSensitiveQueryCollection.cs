@@ -1,44 +1,40 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System.Collections;
-    using System.Collections.Generic;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.Extensions.Primitives;
+﻿namespace SqlStreamStore.HAL;
 
-    internal class CaseSensitiveQueryCollection : IQueryCollection
-    {
-        private readonly QueryString _queryString;
+using System.Collections;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 
-        private Dictionary<string, StringValues> _state;
+internal class CaseSensitiveQueryCollection : IQueryCollection {
+	private readonly QueryString _queryString;
 
-        public CaseSensitiveQueryCollection(QueryString queryString)
-        {
-            _queryString = queryString;
-        }
+	private Dictionary<string, StringValues>? _state;
 
-        private Dictionary<string, StringValues> GetState()
-            => _state
-               ?? (_state = QueryStringHelper.ParseQueryString(_queryString));
+	public CaseSensitiveQueryCollection(QueryString queryString) {
+		_queryString = queryString;
+	}
 
-        public IEnumerator<KeyValuePair<string, StringValues>> GetEnumerator()
-            => GetState().GetEnumerator();
+	private Dictionary<string, StringValues> GetState()
+		=> _state ??= QueryStringHelper.ParseQueryString(_queryString);
 
-        IEnumerator IEnumerable.GetEnumerator()
-            => GetEnumerator();
+	public IEnumerator<KeyValuePair<string, StringValues>> GetEnumerator()
+		=> GetState().GetEnumerator();
 
-        public bool ContainsKey(string key)
-            => GetState().ContainsKey(key);
+	IEnumerator IEnumerable.GetEnumerator()
+		=> GetEnumerator();
 
-        public bool TryGetValue(string key, out StringValues value)
-            => GetState().TryGetValue(key, out value);
+	public bool ContainsKey(string key)
+		=> GetState().ContainsKey(key);
 
-        public int Count
-            => GetState().Count;
+	public bool TryGetValue(string key, out StringValues value)
+		=> GetState().TryGetValue(key, out value);
 
-        public ICollection<string> Keys
-            => GetState().Keys;
+	public int Count
+		=> GetState().Count;
 
-        public StringValues this[string key]
-            => GetState()[key];
-    }
+	public ICollection<string> Keys
+		=> GetState().Keys;
+
+	public StringValues this[string key]
+		=> GetState()[key];
 }

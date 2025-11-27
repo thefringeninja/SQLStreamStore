@@ -1,239 +1,213 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Data;
-    using System.Data.Common;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using MySqlConnector;
-    using SqlStreamStore.MySqlScripts;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore;
 
-    partial class MySqlStreamStore
-    {
-        protected override async Task<ReadAllPage> ReadAllForwardsInternal(
-            long fromPositionExclusive,
-            int maxCount,
-            bool prefetch,
-            ReadNextAllPage readNext,
-            CancellationToken cancellationToken)
-        {
-            maxCount = maxCount == int.MaxValue ? maxCount - 1 : maxCount;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Threading;
+using System.Threading.Tasks;
+using MySqlConnector;
+using SqlStreamStore.MySqlScripts;
+using SqlStreamStore.Streams;
 
-            try
-            {
-                var commandText = prefetch
-                    ? _schema.ReadAllForwardsWithData
-                    : _schema.ReadAllForwards;
+partial class MySqlStreamStore {
+	protected override async Task<ReadAllPage> ReadAllForwardsInternal(
+		long fromPositionExclusive,
+		int maxCount,
+		bool prefetch,
+		ReadNextAllPage readNext,
+		CancellationToken cancellationToken) {
+		maxCount = maxCount == int.MaxValue ? maxCount - 1 : maxCount;
 
-                using (var connection = await OpenConnection(cancellationToken))
-                using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                using (var command = BuildStoredProcedureCall(
-                    commandText,
-                    transaction,
-                    Parameters.Count(maxCount + 1),
-                    Parameters.Position(fromPositionExclusive)))
+		try {
+			var commandText = prefetch
+				? _schema.ReadAllForwardsWithData
+				: _schema.ReadAllForwards;
 
-                using (var reader = await command
-                            .ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken)
-                            .ConfigureAwait(false))
-                {
-                    if (!reader.HasRows)
-                    {
-                        return new ReadAllPage(
-                            fromPositionExclusive,
-                            fromPositionExclusive,
-                            true,
-                            ReadDirection.Forward,
-                            readNext,
-                            Array.Empty<StreamMessage>());
-                    }
+			using (var connection = await OpenConnection(cancellationToken))
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+			using (var command = BuildStoredProcedureCall(
+				       commandText,
+				       transaction,
+				       Parameters.Count(maxCount + 1),
+				       Parameters.Position(fromPositionExclusive)))
 
-                    var messages = new List<(StreamMessage message, int? maxAge)>();
+			using (var reader = await command
+				       .ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken)
+				       .ConfigureAwait(false)) {
+				if (!reader.HasRows) {
+					return new ReadAllPage(
+						fromPositionExclusive,
+						fromPositionExclusive,
+						true,
+						ReadDirection.Forward,
+						readNext,
+						Array.Empty<StreamMessage>());
+				}
 
-                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                    {
-                        if (messages.Count == maxCount)
-                        {
-                            messages.Add(default);
-                        }
-                        else
-                        {
-                            var streamIdInfo = new StreamIdInfo(reader.GetString(0));
-                            var (message, maxAge, _) =
-                                await ReadAllStreamMessage(reader, streamIdInfo.MySqlStreamId, prefetch);
-                            messages.Add((message, maxAge));
-                        }
-                    }
+				var messages = new List<(StreamMessage message, int? maxAge)>();
 
-                    bool isEnd = true;
+				while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) {
+					if (messages.Count == maxCount) {
+						messages.Add(default);
+					} else {
+						var streamIdInfo = new StreamIdInfo(reader.GetString(0));
+						var (message, maxAge, _) =
+							await ReadAllStreamMessage(reader, streamIdInfo.MySqlStreamId, prefetch);
+						messages.Add((message, maxAge));
+					}
+				}
 
-                    if (messages.Count == maxCount + 1) // An extra row was read, we're not at the end
-                    {
-                        isEnd = false;
-                        messages.RemoveAt(maxCount);
-                    }
+				bool isEnd = true;
 
-                    var filteredMessages = FilterExpired(messages);
+				if (messages.Count == maxCount + 1) // An extra row was read, we're not at the end
+				{
+					isEnd = false;
+					messages.RemoveAt(maxCount);
+				}
 
-                    var nextPosition = filteredMessages[filteredMessages.Count - 1].Position + 1;
+				var filteredMessages = FilterExpired(messages);
 
-                    return new ReadAllPage(
-                        fromPositionExclusive,
-                        nextPosition,
-                        isEnd,
-                        ReadDirection.Forward,
-                        readNext,
-                        filteredMessages.ToArray());
-                }
-            }
-            catch(MySqlException exception) when(exception.InnerException is ObjectDisposedException disposedException)
-            {
-                throw new ObjectDisposedException(disposedException.Message, exception);
-            }
-        }
+				var nextPosition = filteredMessages[filteredMessages.Count - 1].Position + 1;
 
-        protected override async Task<ReadAllPage> ReadAllBackwardsInternal(
-            long fromPositionExclusive,
-            int maxCount,
-            bool prefetch,
-            ReadNextAllPage readNext,
-            CancellationToken cancellationToken)
-        {
-            maxCount = maxCount == int.MaxValue ? maxCount - 1 : maxCount;
-            var ordinal = fromPositionExclusive == Position.End ? long.MaxValue - 1 : fromPositionExclusive;
+				return new ReadAllPage(
+					fromPositionExclusive,
+					nextPosition,
+					isEnd,
+					ReadDirection.Forward,
+					readNext,
+					filteredMessages.ToArray());
+			}
+		} catch (MySqlException exception) when (exception.InnerException is ObjectDisposedException disposedException) {
+			throw new ObjectDisposedException(disposedException.Message, exception);
+		}
+	}
 
-            try
-            {
-                var commandText = prefetch
-                    ? _schema.ReadAllBackwardsWithData
-                    : _schema.ReadAllBackwards;
+	protected override async Task<ReadAllPage> ReadAllBackwardsInternal(
+		long fromPositionExclusive,
+		int maxCount,
+		bool prefetch,
+		ReadNextAllPage readNext,
+		CancellationToken cancellationToken) {
+		maxCount = maxCount == int.MaxValue ? maxCount - 1 : maxCount;
+		var ordinal = fromPositionExclusive == Position.End ? long.MaxValue - 1 : fromPositionExclusive;
 
-                using (var connection = await OpenConnection(cancellationToken))
-                using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                using (var command = BuildStoredProcedureCall(
-                    commandText,
-                    transaction,
-                    Parameters.Count(maxCount + 1),
-                    Parameters.Position(ordinal)))
-                using (var reader = await command
-                    .ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken)
-                    .ConfigureAwait(false))
-                {
-                    if(!reader.HasRows)
-                    {
-                        // When reading backwards and there are no more items, then next position is LongPosition.Start,
-                        // regardless of what the fromPosition is.
-                        return new ReadAllPage(
-                            Position.Start,
-                            Position.Start,
-                            true,
-                            ReadDirection.Backward,
-                            readNext,
-                            Array.Empty<StreamMessage>());
-                    }
+		try {
+			var commandText = prefetch
+				? _schema.ReadAllBackwardsWithData
+				: _schema.ReadAllBackwards;
 
-                    var messages = new List<(StreamMessage message, int? maxAge)>();
+			using (var connection = await OpenConnection(cancellationToken))
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+			using (var command = BuildStoredProcedureCall(
+				       commandText,
+				       transaction,
+				       Parameters.Count(maxCount + 1),
+				       Parameters.Position(ordinal)))
+			using (var reader = await command
+				       .ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken)
+				       .ConfigureAwait(false)) {
+				if (!reader.HasRows) {
+					// When reading backwards and there are no more items, then next position is LongPosition.Start,
+					// regardless of what the fromPosition is.
+					return new ReadAllPage(
+						Position.Start,
+						Position.Start,
+						true,
+						ReadDirection.Backward,
+						readNext,
+						Array.Empty<StreamMessage>());
+				}
 
-                    long lastOrdinal = 0;
-                    while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                    {
-                        var streamIdInfo = new StreamIdInfo(reader.GetString(0));
-                        var (message, maxAge, position) =
-                            await ReadAllStreamMessage(reader, streamIdInfo.MySqlStreamId, prefetch);
-                        messages.Add((message, maxAge));
+				var messages = new List<(StreamMessage message, int? maxAge)>();
 
-                        lastOrdinal = position;
-                    }
+				long lastOrdinal = 0;
+				while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) {
+					var streamIdInfo = new StreamIdInfo(reader.GetString(0));
+					var (message, maxAge, position) =
+						await ReadAllStreamMessage(reader, streamIdInfo.MySqlStreamId, prefetch);
+					messages.Add((message, maxAge));
 
-                    bool isEnd = true;
-                    var nextPosition = lastOrdinal;
+					lastOrdinal = position;
+				}
 
-                    if(messages.Count == maxCount + 1) // An extra row was read, we're not at the end
-                    {
-                        isEnd = false;
-                        messages.RemoveAt(maxCount);
-                    }
+				bool isEnd = true;
+				var nextPosition = lastOrdinal;
 
-                    var filteredMessages = FilterExpired(messages);
+				if (messages.Count == maxCount + 1) // An extra row was read, we're not at the end
+				{
+					isEnd = false;
+					messages.RemoveAt(maxCount);
+				}
 
-                    fromPositionExclusive = filteredMessages.Count > 0 ? filteredMessages[0].Position : 0;
+				var filteredMessages = FilterExpired(messages);
 
-                    return new ReadAllPage(
-                        fromPositionExclusive,
-                        nextPosition,
-                        isEnd,
-                        ReadDirection.Backward,
-                        readNext,
-                        filteredMessages.ToArray());
-                }
-            }
-            catch(MySqlException exception) when(exception.InnerException is ObjectDisposedException disposedException)
-            {
-                throw new ObjectDisposedException(disposedException.Message, exception);
-            }
-        }
+				fromPositionExclusive = filteredMessages.Count > 0 ? filteredMessages[0].Position : 0;
 
-        private async Task<(StreamMessage message, int? maxAge, long position)> ReadAllStreamMessage(
-            DbDataReader reader,
-            MySqlStreamId streamId,
-            bool prefetch)
-        {
-            async Task<string> ReadString(int ordinal)
-            {
-                if (await reader.IsDBNullAsync(ordinal))
-                {
-                    return null;
-                }
+				return new ReadAllPage(
+					fromPositionExclusive,
+					nextPosition,
+					isEnd,
+					ReadDirection.Backward,
+					readNext,
+					filteredMessages.ToArray());
+			}
+		} catch (MySqlException exception) when (exception.InnerException is ObjectDisposedException disposedException) {
+			throw new ObjectDisposedException(disposedException.Message, exception);
+		}
+	}
 
-                using (var textReader = reader.GetTextReader(ordinal))
-                {
-                    return await textReader.ReadToEndAsync().ConfigureAwait(false);
-                }
-            }
+	private async Task<(StreamMessage message, int? maxAge, long position)> ReadAllStreamMessage(
+		DbDataReader reader,
+		MySqlStreamId streamId,
+		bool prefetch) {
+		async Task<string?> ReadString(int ordinal) {
+			if (await reader.IsDBNullAsync(ordinal)) {
+				return null;
+			}
 
-            var maxAge = await reader.IsDBNullAsync(1).ConfigureAwait(false)
-                ? default
-                : reader.GetInt32(1);
-            var messageId = reader.GetGuid(2);
-            var streamVersion = reader.GetInt32(3);
-            var position = reader.GetInt64(4);
-            var createdUtc = reader.GetDateTime(5);
-            var type = reader.GetString(6);
-            var jsonMetadata = await ReadString(7);
+			using (var textReader = reader.GetTextReader(ordinal)) {
+				return await textReader.ReadToEndAsync().ConfigureAwait(false);
+			}
+		}
 
-            StreamMessage streamMessage;
+		var maxAge = await reader.IsDBNullAsync(1).ConfigureAwait(false)
+			? default
+			: reader.GetInt32(1);
+		var messageId = reader.GetGuid(2);
+		var streamVersion = reader.GetInt32(3);
+		var position = reader.GetInt64(4);
+		var createdUtc = reader.GetDateTime(5);
+		var type = reader.GetString(6);
+		var jsonMetadata = await ReadString(7);
 
-            if (prefetch)
-            {
+		StreamMessage streamMessage;
 
-                var jsonData = await ReadString(8);
+		if (prefetch) {
 
-                streamMessage = new StreamMessage(
-                    streamId.IdOriginal,
-                    messageId,
-                    streamVersion,
-                    position,
-                    createdUtc,
-                    type,
-                    jsonMetadata,
-                    jsonData);
-            }
-            else
-            {
-                streamMessage = new StreamMessage(
-                    streamId.IdOriginal,
-                    messageId,
-                    streamVersion,
-                    position,
-                    createdUtc,
-                    type,
-                    jsonMetadata,
-                    ct => GetJsonData(streamId, streamVersion)(ct));
-            }
+			var jsonData = await ReadString(8);
 
-            return (streamMessage, maxAge, position);
-        }
-    }
+			streamMessage = new StreamMessage(
+				streamId.IdOriginal,
+				messageId,
+				streamVersion,
+				position,
+				createdUtc,
+				type,
+				jsonMetadata,
+				jsonData);
+		} else {
+			streamMessage = new StreamMessage(
+				streamId.IdOriginal,
+				messageId,
+				streamVersion,
+				position,
+				createdUtc,
+				type,
+				jsonMetadata,
+				ct => GetJsonData(streamId, streamVersion)(ct));
+		}
+
+		return (streamMessage, maxAge, position);
+	}
 }

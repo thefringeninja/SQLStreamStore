@@ -1,157 +1,144 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Linq;
-    using System.Threading.Tasks;
-    using Shouldly;
-    using SqlStreamStore.Streams;
-    using Xunit;
-    using static Streams.Deleted;
+﻿namespace SqlStreamStore;
 
-    public partial class AcceptanceTests
-    {
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_no_expected_version_and_read_then_should_get_StreamNotFound()
-        {
-            const string streamId = "stream";
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Shouldly;
+using SqlStreamStore.Streams;
+using Xunit;
+using static Streams.Deleted;
 
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
-            await Store.DeleteStream(streamId);
+public partial class AcceptanceTests {
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_no_expected_version_and_read_then_should_get_StreamNotFound() {
+		const string streamId = "stream";
 
-            var page =
-                await Store.ReadStreamForwards(streamId, StreamVersion.Start, 10);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		await Store.DeleteStream(streamId);
 
-            page.Status.ShouldBe(PageReadStatus.StreamNotFound);
-        }
+		var page =
+			await Store.ReadStreamForwards(streamId, StreamVersion.Start, 10);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_expected_version_any_and_then_read_then_should_stream_deleted_message()
-        {
-            const string streamId = "stream";
+		page.Status.ShouldBe(PageReadStatus.StreamNotFound);
+	}
 
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
-            await Store.DeleteStream(streamId, 2);
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_expected_version_any_and_then_read_then_should_stream_deleted_message() {
+		const string streamId = "stream";
 
-            var page =
-                await Store.ReadStreamBackwards(DeletedStreamId, StreamVersion.End, 1);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		await Store.DeleteStream(streamId, 2);
 
-            page.Status.ShouldBe(PageReadStatus.Success);
-            var message = page.Messages.Single();
-            message.Type.ShouldBe(StreamDeletedMessageType);
-            var streamDeleted = await message.GetJsonDataAs<StreamDeleted>();
-            streamDeleted.StreamId.ShouldBe("stream");
-        }
+		var page =
+			await Store.ReadStreamBackwards(DeletedStreamId, StreamVersion.End, 1);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_no_expected_version_and_read_all_then_should_not_see_deleted_stream_messages()
-        {
-            const string streamId = "stream";
+		page.Status.ShouldBe(PageReadStatus.Success);
+		var message = page.Messages.Single();
+		message.Type.ShouldBe(StreamDeletedMessageType);
+		var streamDeleted = await message.GetJsonDataAs<StreamDeleted>();
+		streamDeleted.StreamId.ShouldBe("stream");
+	}
 
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
-            await Store.DeleteStream(streamId);
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_no_expected_version_and_read_all_then_should_not_see_deleted_stream_messages() {
+		const string streamId = "stream";
 
-            var page = await Store.ReadAllForwards(Position.Start, 10);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		await Store.DeleteStream(streamId);
 
-            page.Messages.Any(message => message.StreamId == streamId).ShouldBeFalse();
-        }
+		var page = await Store.ReadAllForwards(Position.Start, 10);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public void When_delete_stream_that_does_not_exist()
-        {
-            const string streamId = "notexist";
-            Func<Task> act = () => Store.DeleteStream(streamId);
+		page.Messages.Any(message => message.StreamId == streamId).ShouldBeFalse();
+	}
 
-            act.ShouldNotThrow();
-        }
+	[Fact, Trait("Category", "DeleteStream")]
+	public void When_delete_stream_that_does_not_exist() {
+		const string streamId = "notexist";
+		Func<Task> act = () => Store.DeleteStream(streamId);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_a_matching_expected_version_and_read_then_should_get_StreamNotFound()
-        {
-            const string streamId = "stream";
+		act.ShouldNotThrow();
+	}
 
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
-            await Store.DeleteStream(streamId, 2);
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_a_matching_expected_version_and_read_then_should_get_StreamNotFound() {
+		const string streamId = "stream";
 
-            var page = await Store.ReadStreamForwards(streamId, StreamVersion.Start, 10);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		await Store.DeleteStream(streamId, 2);
 
-            page.Status.ShouldBe(PageReadStatus.StreamNotFound);
-        }
+		var page = await Store.ReadStreamForwards(streamId, StreamVersion.Start, 10);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_a_matching_expected_version_and_read_then_should_get_stream_deleted_message()
-        {
-            const string streamId = "stream";
+		page.Status.ShouldBe(PageReadStatus.StreamNotFound);
+	}
 
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
-            await Store.DeleteStream(streamId, 2);
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_a_matching_expected_version_and_read_then_should_get_stream_deleted_message() {
+		const string streamId = "stream";
 
-            var page = await Store.ReadStreamBackwards(DeletedStreamId, StreamVersion.End, 1);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		await Store.DeleteStream(streamId, 2);
 
-            page.Status.ShouldBe(PageReadStatus.Success);
-            var message = page.Messages.Single();
-            message.Type.ShouldBe(StreamDeletedMessageType);
-            var streamDeleted = await message.GetJsonDataAs<StreamDeleted>();
-            streamDeleted.StreamId.ShouldBe("stream");
-        }
+		var page = await Store.ReadStreamBackwards(DeletedStreamId, StreamVersion.End, 1);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_a_matching_expected_version_and_read_all_then_should_not_see_deleted_stream_messages()
-        {
-            const string streamId = "stream";
+		page.Status.ShouldBe(PageReadStatus.Success);
+		var message = page.Messages.Single();
+		message.Type.ShouldBe(StreamDeletedMessageType);
+		var streamDeleted = await message.GetJsonDataAs<StreamDeleted>();
+		streamDeleted.StreamId.ShouldBe("stream");
+	}
 
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
-            await Store.DeleteStream(streamId);
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_a_matching_expected_version_and_read_all_then_should_not_see_deleted_stream_messages() {
+		const string streamId = "stream";
 
-            var allMessagesPage = await Store.ReadAllForwards(Position.Start, 10);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		await Store.DeleteStream(streamId);
 
-            allMessagesPage.Messages.Any(message => message.StreamId == streamId).ShouldBeFalse();
-        }
+		var allMessagesPage = await Store.ReadAllForwards(Position.Start, 10);
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_that_does_not_exist_then_should_not_throw()
-        {
-            const string streamId = "notexist";
+		allMessagesPage.Messages.Any(message => message.StreamId == streamId).ShouldBeFalse();
+	}
 
-            var exception = await Record.ExceptionAsync(() => Store.DeleteStream(streamId));
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_that_does_not_exist_then_should_not_throw() {
+		const string streamId = "notexist";
 
-            exception.ShouldBeNull();
-        }
+		var exception = await Record.ExceptionAsync(() => Store.DeleteStream(streamId));
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_that_does_not_exist_with_expected_version_number_then_should_not_throw()
-        {
-            const string streamId = "notexist";
-            const int expectedVersion = 1;
+		exception.ShouldBeNull();
+	}
 
-            var exception = await Record.ExceptionAsync(() =>
-                Store.DeleteStream(streamId, expectedVersion));
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_that_does_not_exist_with_expected_version_number_then_should_not_throw() {
+		const string streamId = "notexist";
+		const int expectedVersion = 1;
 
-            exception.ShouldBeOfType<WrongExpectedVersionException>(
-                ErrorMessages.DeleteStreamFailedWrongExpectedVersion(streamId, expectedVersion));
-        }
+		var exception = await Record.ExceptionAsync(() =>
+			Store.DeleteStream(streamId, expectedVersion));
 
-        [Fact, Trait("Category", "DeleteStream")]
-        public async Task When_delete_stream_with_a_non_matching_expected_version_then_should_throw()
-        {
-            const string streamId = "stream";
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
+		exception.ShouldBeOfType<WrongExpectedVersionException>(
+			ErrorMessages.DeleteStreamFailedWrongExpectedVersion(streamId, expectedVersion));
+	}
 
-            var exception = await Record.ExceptionAsync(() =>
-                Store.DeleteStream(streamId, 100));
+	[Fact, Trait("Category", "DeleteStream")]
+	public async Task When_delete_stream_with_a_non_matching_expected_version_then_should_throw() {
+		const string streamId = "stream";
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, CreateNewStreamMessages(1, 2, 3));
 
-            exception.ShouldBeOfType<WrongExpectedVersionException>(
-                    ErrorMessages.DeleteStreamFailedWrongExpectedVersion(streamId, 100));
-        }
+		var exception = await Record.ExceptionAsync(() =>
+			Store.DeleteStream(streamId, 100));
 
-        [Theory, Trait("Category", "DeleteStream")]
-        [InlineData("stream/id")]
-        [InlineData("stream%id")]
-        public async Task When_delete_stream_with_url_encodable_characters_then_should_not_throw(string streamId)
-        {
-            var newStreamMessages = CreateNewStreamMessages(1);
-            await Store.AppendToStream(streamId, ExpectedVersion.NoStream, newStreamMessages);
+		exception.ShouldBeOfType<WrongExpectedVersionException>(
+			ErrorMessages.DeleteStreamFailedWrongExpectedVersion(streamId, 100));
+	}
 
-            await Store.DeleteStream(streamId);
-        }
-    }
+	[Theory, Trait("Category", "DeleteStream")]
+	[InlineData("stream/id")]
+	[InlineData("stream%id")]
+	public async Task When_delete_stream_with_url_encodable_characters_then_should_not_throw(string streamId) {
+		var newStreamMessages = CreateNewStreamMessages(1);
+		await Store.AppendToStream(streamId, ExpectedVersion.NoStream, newStreamMessages);
+
+		await Store.DeleteStream(streamId);
+	}
 }

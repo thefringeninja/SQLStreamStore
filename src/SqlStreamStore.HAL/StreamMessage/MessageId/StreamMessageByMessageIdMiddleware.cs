@@ -1,30 +1,27 @@
-namespace SqlStreamStore.HAL.StreamMessage.MessageId
-{
-    using System.Net.Http;
-    using Microsoft.AspNetCore.Builder;
-    using MidFunc = System.Func<
-        Microsoft.AspNetCore.Http.HttpContext,
-        System.Func<System.Threading.Tasks.Task>,
-        System.Threading.Tasks.Task
-    >;
+namespace SqlStreamStore.HAL.StreamMessage.MessageId;
 
-    internal static class StreamMessageByMessageIdMiddleware
-    {
-        public static IApplicationBuilder UseByMessageId(
-            this IApplicationBuilder builder,
-            StreamMessageResource streamMessages)
-            => builder
-                .UseMiddlewareLogging(typeof(StreamMessageByMessageIdMiddleware))
-                .MapWhen(HttpMethod.Delete, inner => inner.Use(DeleteStreamMessage(streamMessages)))
-                .UseAllowedMethods(streamMessages);
+using System.Net.Http;
+using Microsoft.AspNetCore.Builder;
+using MidFunc = System.Func<
+	Microsoft.AspNetCore.Http.HttpContext,
+	System.Func<System.Threading.Tasks.Task>,
+	System.Threading.Tasks.Task
+>;
 
-        private static MidFunc DeleteStreamMessage(StreamMessageResource streamMessages) => async (context, next) =>
-        {
-            var operation = new DeleteStreamMessageByMessageIdOperation(context);
+internal static class StreamMessageByMessageIdMiddleware {
+	public static IApplicationBuilder UseByMessageId(
+		this IApplicationBuilder builder,
+		StreamMessageResource streamMessages)
+		=> builder
+			.UseMiddlewareLogging(typeof(StreamMessageByMessageIdMiddleware))
+			.MapWhen(HttpMethod.Delete, inner => inner.Use(DeleteStreamMessage(streamMessages)))
+			.UseAllowedMethods(streamMessages);
 
-            var response = await streamMessages.Delete(operation, context.RequestAborted);
+	private static MidFunc DeleteStreamMessage(StreamMessageResource streamMessages) => async (context, next) => {
+		var operation = new DeleteStreamMessageByMessageIdOperation(context);
 
-            await context.WriteResponse(response);
-        };
-    }
+		var response = await streamMessages.Delete(operation, context.RequestAborted);
+
+		await context.WriteResponse(response);
+	};
 }

@@ -1,76 +1,66 @@
-namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Threading.Tasks;
-    using System.Linq;
-    using Shouldly;
-    using SqlStreamStore.Streams;
-    using Xunit;
+namespace SqlStreamStore;
 
-    public partial class AcceptanceTests
-    {
-        [Fact]
-        public async Task Given_large_message_stream_can_be_read_back_in_pages()
-        {
-            var eventsToWrite = CreateNewMessages();
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Shouldly;
+using SqlStreamStore.Streams;
+using Xunit;
 
-            await Store.AppendToStream("stream-1", ExpectedVersion.NoStream, eventsToWrite);
+public partial class AcceptanceTests {
+	[Fact]
+	public async Task Given_large_message_stream_can_be_read_back_in_pages() {
+		var eventsToWrite = CreateNewMessages();
 
-            var readEvents = await new PagedStreamStore(Store).GetAsync("stream-1");
+		await Store.AppendToStream("stream-1", ExpectedVersion.NoStream, eventsToWrite);
 
-            readEvents.Count().ShouldBe(eventsToWrite.Length);
-        }
+		var readEvents = await new PagedStreamStore(Store).GetAsync("stream-1");
 
-        private static NewStreamMessage[] CreateNewMessages()
-        {
-            var eventsToWrite = new List<NewStreamMessage>();
-            var largeStreamCount = 7500;
-            for (int i = 0; i < largeStreamCount; i++)
-            {
-                var envelope = new NewStreamMessage(Guid.NewGuid(), $"message-{i}", "{}", $"{i}");
+		readEvents.Count().ShouldBe(eventsToWrite.Length);
+	}
 
-                eventsToWrite.Add(envelope);
-            }
+	private static NewStreamMessage[] CreateNewMessages() {
+		var eventsToWrite = new List<NewStreamMessage>();
+		var largeStreamCount = 7500;
+		for (int i = 0; i < largeStreamCount; i++) {
+			var envelope = new NewStreamMessage(Guid.NewGuid(), $"message-{i}", "{}", $"{i}");
 
-            return eventsToWrite.ToArray();
-        }
-    }
+			eventsToWrite.Add(envelope);
+		}
 
-    public class PagedStreamStore
-    {
-        private readonly IStreamStore _streamStore;
+		return eventsToWrite.ToArray();
+	}
+}
 
-        public PagedStreamStore(IStreamStore streamStore)
-        {
-            _streamStore = streamStore;
-        }
+public class PagedStreamStore {
+	private readonly IStreamStore _streamStore;
 
-        public async Task<IEnumerable<StreamMessage>> GetAsync(string streamName)
-        {
-            var start = 0;
-            const int BatchSize = 500;
+	public PagedStreamStore(IStreamStore streamStore) {
+		_streamStore = streamStore;
+	}
 
-            ReadStreamPage page;
-            var events = new List<StreamMessage>();
+	public async Task<IEnumerable<StreamMessage>> GetAsync(string streamName) {
+		var start = 0;
+		const int BatchSize = 500;
 
-            do
-            {
-                page = await _streamStore.ReadStreamForwards(streamName, start, BatchSize);
+		ReadStreamPage page;
+		var events = new List<StreamMessage>();
 
-                if (page.Status == PageReadStatus.StreamNotFound)
-                {
-                    throw new Exception("Stream not found");
-                }
+		do {
+			page = await _streamStore.ReadStreamForwards(streamName, start, BatchSize);
 
-                events.AddRange(
-                    page.Messages);
+			if (page.Status == PageReadStatus.StreamNotFound) {
+				throw new Exception("Stream not found");
+			}
 
-                start = page.NextStreamVersion;
-            }
-            while (!page.IsEnd);
+			events.AddRange(
+				page.Messages);
 
-            return events;
-        }
-    }
+			start = page.NextStreamVersion;
+		}
+		while (!page.IsEnd);
+
+		return events;
+	}
 }

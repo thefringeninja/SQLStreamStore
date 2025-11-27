@@ -1,121 +1,109 @@
-namespace SqlStreamStore
-{
-    using System.Threading;
-    using System.Threading.Tasks;
-    using MySqlConnector;
-    using SqlStreamStore.MySqlScripts;
-    using SqlStreamStore.Streams;
-    using StreamStoreStore.Json;
+namespace SqlStreamStore;
 
-    partial class MySqlStreamStore
-    {
-        protected override async Task<StreamMetadataResult> GetStreamMetadataInternal(
-            string streamId,
-            CancellationToken cancellationToken)
-        {
-            var streamIdInfo = new StreamIdInfo(streamId);
+using System.Threading;
+using System.Threading.Tasks;
+using MySqlConnector;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.MySqlScripts;
+using SqlStreamStore.Streams;
 
-            using(var connection = await OpenConnection(cancellationToken))
-            using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-            {
-                return await GetStreamMetadataInternal(streamIdInfo, transaction, cancellationToken);
-            }
-        }
+partial class MySqlStreamStore {
+	protected override async Task<StreamMetadataResult> GetStreamMetadataInternal(
+		string streamId,
+		CancellationToken cancellationToken) {
+		var streamIdInfo = new StreamIdInfo(streamId);
 
-        private async Task<StreamMetadataResult> GetStreamMetadataInternal(
-            StreamIdInfo streamIdInfo,
-            MySqlTransaction transaction,
-            CancellationToken cancellationToken)
-        {
-            var page = await ReadStreamInternal(
-                streamIdInfo.MetadataMySqlStreamId,
-                StreamVersion.End,
-                1,
-                ReadDirection.Backward,
-                true,
-                null,
-                transaction,
-                cancellationToken);
+		using (var connection = await OpenConnection(cancellationToken))
+		using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)) {
+			return await GetStreamMetadataInternal(streamIdInfo, transaction, cancellationToken);
+		}
+	}
 
-            if(page.Status == PageReadStatus.StreamNotFound)
-            {
-                return new StreamMetadataResult(streamIdInfo.MySqlStreamId.IdOriginal, -1);
-            }
+	private async Task<StreamMetadataResult> GetStreamMetadataInternal(
+		StreamIdInfo streamIdInfo,
+		MySqlTransaction transaction,
+		CancellationToken cancellationToken) {
+		var page = await ReadStreamInternal(
+			streamIdInfo.MetadataMySqlStreamId,
+			StreamVersion.End,
+			1,
+			ReadDirection.Backward,
+			true,
+			null!,
+			transaction,
+			cancellationToken);
 
-            var metadataMessage = await page.Messages[0].GetJsonDataAs<MetadataMessage>(cancellationToken);
+		if (page.Status == PageReadStatus.StreamNotFound) {
+			return new StreamMetadataResult(streamIdInfo.MySqlStreamId.IdOriginal, -1);
+		}
 
-            return new StreamMetadataResult(
-                streamIdInfo.MySqlStreamId.IdOriginal,
-                page.LastStreamVersion,
-                metadataMessage.MaxAge,
-                metadataMessage.MaxCount,
-                metadataMessage.MetaJson);
-        }
+		var metadataMessage = await page.Messages[0].GetJsonDataAs<MetadataMessage>(cancellationToken);
 
-        protected override async Task<SetStreamMetadataResult> SetStreamMetadataInternal(
-            string streamId,
-            int expectedStreamMetadataVersion,
-            int? maxAge,
-            int? maxCount,
-            string metadataJson,
-            CancellationToken cancellationToken)
-        {
-            var metadata = new MetadataMessage
-            {
-                StreamId = streamId,
-                MaxAge = maxAge,
-                MaxCount = maxCount,
-                MetaJson = metadataJson
-            };
+		return new StreamMetadataResult(
+			streamIdInfo.MySqlStreamId.IdOriginal,
+			page.LastStreamVersion,
+			metadataMessage.MaxAge,
+			metadataMessage.MaxCount,
+			metadataMessage.MetaJson);
+	}
 
-            var metadataMessageJsonData = SimpleJson.SerializeObject(metadata);
+	protected override async Task<SetStreamMetadataResult> SetStreamMetadataInternal(
+		string streamId,
+		int expectedStreamMetadataVersion,
+		int? maxAge,
+		int? maxCount,
+		string? metadataJson,
+		CancellationToken cancellationToken) {
+		var metadata = new MetadataMessage {
+			StreamId = streamId,
+			MaxAge = maxAge,
+			MaxCount = maxCount,
+			MetaJson = metadataJson
+		};
 
-            var streamIdInfo = new StreamIdInfo(streamId);
+		var metadataMessageJsonData = SimpleJson.SerializeObject(metadata);
 
-            var currentVersion = Parameters.CurrentVersion();
+		var streamIdInfo = new StreamIdInfo(streamId);
 
-            try
-            {
-                using(var connection = await OpenConnection(cancellationToken))
-                using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                using(var command = BuildStoredProcedureCall(
-                    _schema.SetStreamMetadata,
-                    transaction,
-                    Parameters.StreamId(streamIdInfo.MySqlStreamId),
-                    Parameters.MetadataStreamId(streamIdInfo.MetadataMySqlStreamId),
-                    Parameters.MetadataStreamIdOriginal(streamIdInfo.MetadataMySqlStreamId),
-                    Parameters.OptionalMaxAge(metadata.MaxAge),
-                    Parameters.OptionalMaxCount(metadata.MaxCount),
-                    Parameters.ExpectedVersion(expectedStreamMetadataVersion),
-                    Parameters.CreatedUtc(_settings.GetUtcNow?.Invoke()),
-                    Parameters.MetadataMessageMessageId(
-                        streamIdInfo.MetadataMySqlStreamId,
-                        expectedStreamMetadataVersion,
-                        metadataMessageJsonData),
-                    Parameters.MetadataMessageType(),
-                    Parameters.MetadataMessageJsonData(metadataMessageJsonData),
-                    currentVersion,
-                    Parameters.CurrentPosition()))
-                {
-                    await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+		var currentVersion = Parameters.CurrentVersion();
 
-                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-                }
+		try {
+			using (var connection = await OpenConnection(cancellationToken))
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+			using (var command = BuildStoredProcedureCall(
+				       _schema.SetStreamMetadata,
+				       transaction,
+				       Parameters.StreamId(streamIdInfo.MySqlStreamId),
+				       Parameters.MetadataStreamId(streamIdInfo.MetadataMySqlStreamId),
+				       Parameters.MetadataStreamIdOriginal(streamIdInfo.MetadataMySqlStreamId),
+				       Parameters.OptionalMaxAge(metadata.MaxAge),
+				       Parameters.OptionalMaxCount(metadata.MaxCount),
+				       Parameters.ExpectedVersion(expectedStreamMetadataVersion),
+				       Parameters.CreatedUtc(_settings.GetUtcNow?.Invoke()),
+				       Parameters.MetadataMessageMessageId(
+					       streamIdInfo.MetadataMySqlStreamId,
+					       expectedStreamMetadataVersion,
+					       metadataMessageJsonData),
+				       Parameters.MetadataMessageType(),
+				       Parameters.MetadataMessageJsonData(metadataMessageJsonData),
+				       currentVersion,
+				       Parameters.CurrentPosition())) {
+				await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
-                await TryScavenge(streamIdInfo, cancellationToken);
+				await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+			}
 
-                return new SetStreamMetadataResult((int) currentVersion.Value);
-            }
-            catch(MySqlException ex) when(ex.IsWrongExpectedVersion())
-            {
-                throw new WrongExpectedVersionException(
-                    ErrorMessages.AppendFailedWrongExpectedVersion(
-                        streamIdInfo.MetadataMySqlStreamId.IdOriginal,
-                        expectedStreamMetadataVersion),
-                    streamIdInfo.MetadataMySqlStreamId.IdOriginal,
-                    ExpectedVersion.Any,
-                    ex);
-            }
-        }
-    }
+			await TryScavenge(streamIdInfo, cancellationToken);
+
+			return new SetStreamMetadataResult((int)currentVersion.Value!);
+		} catch (MySqlException ex) when (ex.IsWrongExpectedVersion()) {
+			throw new WrongExpectedVersionException(
+				ErrorMessages.AppendFailedWrongExpectedVersion(
+					streamIdInfo.MetadataMySqlStreamId.IdOriginal,
+					expectedStreamMetadataVersion),
+				streamIdInfo.MetadataMySqlStreamId.IdOriginal,
+				ExpectedVersion.Any,
+				ex);
+		}
+	}
 }

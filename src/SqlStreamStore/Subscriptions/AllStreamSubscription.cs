@@ -1,253 +1,213 @@
-﻿namespace SqlStreamStore.Subscriptions
-{
-    using System;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.Streams;
-    using SqlStreamStore;
-    using SqlStreamStore.Imports.AsyncEx.Nito.AsyncEx.Coordination;
-    using SqlStreamStore.Logging;
+﻿namespace SqlStreamStore.Subscriptions;
 
-    /// <summary>
-    ///     Represents a subscription to all streams.
-    /// </summary>
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using DotNext.Threading;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using SqlStreamStore;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.Streams;
 
-    public sealed class AllStreamSubscription : IAllStreamSubscription
-    {
-        public const int DefaultPageSize = 10;
-        private static readonly ILog s_logger = LogProvider.GetLogger("SqlStreamStore.Subscriptions.AllStreamSubscription");
-        private int _pageSize = DefaultPageSize;
-        private long _nextPosition;
-        private readonly IReadonlyStreamStore _readonlyStreamStore;
-        private readonly AllStreamMessageReceived _streamMessageReceived;
-        private readonly bool _prefetchJsonData;
-        private readonly HasCaughtUp _hasCaughtUp;
-        private readonly AllSubscriptionDropped _subscriptionDropped;
-        private readonly IDisposable _notification;
-        private readonly CancellationTokenSource _disposed = new CancellationTokenSource();
-        private readonly AsyncAutoResetEvent _streamStoreNotification = new AsyncAutoResetEvent();
-        private readonly TaskCompletionSource<object> _started = new TaskCompletionSource<object>();
-        private readonly InterlockedBoolean _notificationRaised = new InterlockedBoolean();
+/// <summary>
+///     Represents a subscription to all streams.
+/// </summary>
 
-        public AllStreamSubscription(
-            long? continueAfterPosition,
-            IReadonlyStreamStore readonlyStreamStore,
-            IObservable<Unit> streamStoreAppendedNotification,
-            AllStreamMessageReceived streamMessageReceived,
-            AllSubscriptionDropped subscriptionDropped,
-            HasCaughtUp hasCaughtUp,
-            bool prefetchJsonData,
-            string name)
-        {
-            FromPosition = continueAfterPosition;
-            LastPosition = continueAfterPosition;
-            _nextPosition = continueAfterPosition + 1 ?? Position.Start;
-            _readonlyStreamStore = readonlyStreamStore;
-            _streamMessageReceived = streamMessageReceived;
-            _prefetchJsonData = prefetchJsonData;
-            _subscriptionDropped = subscriptionDropped ?? ((_, __, ___) => { });
-            _hasCaughtUp = hasCaughtUp ?? (_ => { });
-            Name = string.IsNullOrWhiteSpace(name) ? Guid.NewGuid().ToString() : name;
+public sealed class AllStreamSubscription : IAllStreamSubscription {
+	public const int DefaultPageSize = 10;
+	private int _pageSize = DefaultPageSize;
+	private long _nextPosition;
+	private readonly IReadonlyStreamStore _readonlyStreamStore;
+	private readonly AllStreamMessageReceived _streamMessageReceived;
+	private readonly bool _prefetchJsonData;
+	private readonly ILogger _logger;
+	private readonly HasCaughtUp _hasCaughtUp;
+	private readonly AllSubscriptionDropped _subscriptionDropped;
+	private readonly IDisposable _notification;
+	private readonly CancellationTokenSource _disposed = new();
+	private readonly AsyncAutoResetEvent _streamStoreNotification = new(false);
+	private readonly TaskCompletionSource _started = new();
+	private readonly InterlockedBoolean _notificationRaised = new();
 
-            readonlyStreamStore.OnDispose += ReadonlyStreamStoreOnOnDispose;
+	public AllStreamSubscription(
+		long? continueAfterPosition,
+		IReadonlyStreamStore readonlyStreamStore,
+		IObservable<Unit> streamStoreAppendedNotification,
+		AllStreamMessageReceived streamMessageReceived,
+		AllSubscriptionDropped? subscriptionDropped,
+		HasCaughtUp? hasCaughtUp,
+		bool prefetchJsonData,
+		string? name,
+		ILogger? logger = null) {
+		FromPosition = continueAfterPosition;
+		LastPosition = continueAfterPosition;
+		_nextPosition = continueAfterPosition + 1 ?? Position.Start;
+		_readonlyStreamStore = readonlyStreamStore;
+		_streamMessageReceived = streamMessageReceived;
+		_prefetchJsonData = prefetchJsonData;
+		_logger = logger ?? NullLogger.Instance;
+		_subscriptionDropped = subscriptionDropped ?? ((_, __, ___) => { });
+		_hasCaughtUp = hasCaughtUp ?? (_ => { });
+		Name = string.IsNullOrWhiteSpace(name) ? Guid.NewGuid().ToString() : name;
 
-            _notification = streamStoreAppendedNotification.Subscribe(_ =>
-            {
-                _streamStoreNotification.Set();
-            });
+		readonlyStreamStore.OnDispose += ReadonlyStreamStoreOnOnDispose;
 
-            Task.Run(PullAndPush);
+		_notification = streamStoreAppendedNotification.Subscribe(_ => {
+			_streamStoreNotification.Set();
+		});
 
-            s_logger.Info(
-                "AllStream subscription created {name} continuing after position {position}",
-                Name,
-                continueAfterPosition?.ToString() ?? "<null>");
-        }
+		Task.Run(PullAndPush);
 
-        /// <inheritdoc />
-        public string Name { get; }
+		if (_logger.IsEnabled(LogLevel.Information)) {
+			_logger.LogInformation(
+				"AllStream subscription created {name} continuing after position {position}",
+				Name,
+				continueAfterPosition?.ToString() ?? "<null>");
+		}
+	}
 
-        /// <inheritdoc />
-        public long? FromPosition { get; }
+	/// <inheritdoc />
+	public string Name { get; }
 
-        /// <inheritdoc />
-        public long? LastPosition { get; private set; }
+	/// <inheritdoc />
+	public long? FromPosition { get; }
 
-        /// <inheritdoc />
-        public Task Started => _started.Task;
+	/// <inheritdoc />
+	public long? LastPosition { get; private set; }
 
-        /// <inheritdoc />
-        public int MaxCountPerRead
-        {
-            get => _pageSize;
-            set => _pageSize = value <= 0 ? 1 : value;
-        }
+	/// <inheritdoc />
+	public Task Started => _started.Task;
 
-        /// <inheritdoc />
-        public void Dispose()
-        {
-            if (_disposed.IsCancellationRequested)
-            {
-                return;
-            }
-            _disposed.Cancel();
-            _notification.Dispose();
-        }
+	/// <inheritdoc />
+	public int MaxCountPerRead {
+		get => _pageSize;
+		set => _pageSize = value <= 0 ? 1 : value;
+	}
 
-        private void ReadonlyStreamStoreOnOnDispose()
-        {
-            _readonlyStreamStore.OnDispose -= ReadonlyStreamStoreOnOnDispose;
-            Dispose();
-        }
+	/// <inheritdoc />
+	public void Dispose() {
+		if (_disposed.IsCancellationRequested) {
+			return;
+		}
+		_disposed.Cancel();
+		_notification.Dispose();
+	}
 
-        private async Task PullAndPush()
-        {
-            if (FromPosition == Position.End)
-            {
-                await Initialize();
-            }
-            _started.SetResult(null);
+	private void ReadonlyStreamStoreOnOnDispose() {
+		_readonlyStreamStore.OnDispose -= ReadonlyStreamStoreOnOnDispose;
+		Dispose();
+	}
 
-            while (true)
-            {
-                bool pause = false;
-                bool? lastHasCaughtUp = null;
+	private async Task PullAndPush() {
+		if (FromPosition == Position.End) {
+			await Initialize();
+		}
+		_started.SetResult();
 
-                while (!pause)
-                {
-                    var page = await Pull();
+		while (true) {
+			bool pause = false;
+			bool? lastHasCaughtUp = null;
 
-                    await Push(page);
+			while (!pause) {
+				var page = await Pull();
 
-                    if ((!lastHasCaughtUp.HasValue && page.IsEnd) ||
-                       ((!lastHasCaughtUp.HasValue || lastHasCaughtUp.Value != page.IsEnd)
-                       && page.Messages.Length > 0))
-                    {
-                        // Only raise if the state changes and there were messages read
-                        lastHasCaughtUp = page.IsEnd;
-                        _hasCaughtUp(page.IsEnd);
-                    }
+				await Push(page);
 
-                    pause = page.IsEnd && page.Messages.Length == 0;
-                }
+				if ((!lastHasCaughtUp.HasValue && page.IsEnd) ||
+				    ((!lastHasCaughtUp.HasValue || lastHasCaughtUp.Value != page.IsEnd)
+				     && page.Messages.Length > 0)) {
+					// Only raise if the state changes and there were messages read
+					lastHasCaughtUp = page.IsEnd;
+					_hasCaughtUp(page.IsEnd);
+				}
 
-                // Wait for notification before starting again.
-                try
-                {
-                    await _streamStoreNotification.WaitAsync(_disposed.Token).ConfigureAwait(false);
-                }
-                catch (TaskCanceledException)
-                {
-                    NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
-                    throw;
-                }
-            }
-        }
+				pause = page.IsEnd && page.Messages.Length == 0;
+			}
 
-        private async Task Initialize()
-        {
-            long headPosition;
-            try
-            {
-                // Get the last stream version and subscribe from there.
-                headPosition = await _readonlyStreamStore.ReadHeadPosition(_disposed.Token)
-                    .ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-                NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
-                throw;
-            }
-            catch (OperationCanceledException)
-            {
-                NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                s_logger.ErrorException($"Error reading stream {Name}", ex);
-                NotifySubscriptionDropped(SubscriptionDroppedReason.StreamStoreError, ex);
-                throw;
-            }
+			// Wait for notification before starting again.
+			try {
+				await _streamStoreNotification.WaitAsync(_disposed.Token).ConfigureAwait(false);
+			} catch (TaskCanceledException) {
+				NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
+				throw;
+			}
+		}
+	}
 
-            // Only new Messages, i.e. the one after the current last one.
-            // Edge case for empty store where Next position 0 (when FromPosition = 0)
-            _nextPosition = headPosition == 0 ? 0 : headPosition + 1;
-        }
+	private async Task Initialize() {
+		long headPosition;
+		try {
+			// Get the last stream version and subscribe from there.
+			headPosition = await _readonlyStreamStore.ReadHeadPosition(_disposed.Token)
+				.ConfigureAwait(false);
+		} catch (ObjectDisposedException) {
+			NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
+			throw;
+		} catch (OperationCanceledException) {
+			NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
+			throw;
+		} catch (Exception ex) {
+			_logger.LogError(ex, "Error reading stream {name}", Name);
+			NotifySubscriptionDropped(SubscriptionDroppedReason.StreamStoreError, ex);
+			throw;
+		}
 
-        private async Task<ReadAllPage> Pull()
-        {
-            ReadAllPage readAllPage;
-            try
-            {
-                readAllPage = await _readonlyStreamStore
-                    .ReadAllForwards(_nextPosition, MaxCountPerRead, _prefetchJsonData, _disposed.Token)
-                    .ConfigureAwait(false);
-            }
-            catch(ObjectDisposedException)
-            {
-                NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
-                throw;
-            }
-            catch (OperationCanceledException)
-            {
-                NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                s_logger.ErrorException($"Error reading all stream {Name}", ex);
-                NotifySubscriptionDropped(SubscriptionDroppedReason.StreamStoreError, ex);
-                throw;
-            }
-            return readAllPage;
-        }
+		// Only new Messages, i.e. the one after the current last one.
+		// Edge case for empty store where Next position 0 (when FromPosition = 0)
+		_nextPosition = headPosition == 0 ? 0 : headPosition + 1;
+	}
 
-        private async Task Push(ReadAllPage page)
-        {
-            foreach (var message in page.Messages)
-            {
-                if (_disposed.IsCancellationRequested)
-                {
-                    NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
-                    _disposed.Token.ThrowIfCancellationRequested();
-                }
-                _nextPosition = message.Position + 1;
-                LastPosition = message.Position;
-                try
-                {
-                    await _streamMessageReceived(this, message, _disposed.Token).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    s_logger.ErrorException(
-                        $"Exception with subscriber receiving message {Name}" +
-                        $"Message: {message}.",
-                        ex);
-                    NotifySubscriptionDropped(SubscriptionDroppedReason.SubscriberError, ex);
-                    throw;
-                }
-            }
-        }
+	private async Task<ReadAllPage> Pull() {
+		ReadAllPage readAllPage;
+		try {
+			readAllPage = await _readonlyStreamStore
+				.ReadAllForwards(_nextPosition, MaxCountPerRead, _prefetchJsonData, _disposed.Token)
+				.ConfigureAwait(false);
+		} catch (ObjectDisposedException) {
+			NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
+			throw;
+		} catch (OperationCanceledException) {
+			NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
+			throw;
+		} catch (Exception ex) {
+			_logger.LogError(ex, "Error reading all stream {name}", Name);
+			NotifySubscriptionDropped(SubscriptionDroppedReason.StreamStoreError, ex);
+			throw;
+		}
+		return readAllPage;
+	}
 
-        private void NotifySubscriptionDropped(SubscriptionDroppedReason reason, Exception exception = null)
-        {
-            if (_notificationRaised.CompareExchange(true, false))
-            {
-                return;
-            }
-            try
-            {
-                s_logger.InfoException($"All stream subscription dropped {Name}. Reason: {reason}", exception);
-                _subscriptionDropped.Invoke(this, reason, exception);
-            }
-            catch (Exception ex)
-            {
-                s_logger.ErrorException(
-                    $"Error notifying subscriber that subscription has been dropped ({Name}).",
-                    ex);
-            }
-        }
-    }
+	private async Task Push(ReadAllPage page) {
+		foreach (var message in page.Messages) {
+			if (_disposed.IsCancellationRequested) {
+				NotifySubscriptionDropped(SubscriptionDroppedReason.Disposed);
+				_disposed.Token.ThrowIfCancellationRequested();
+			}
+			_nextPosition = message.Position + 1;
+			LastPosition = message.Position;
+			try {
+				await _streamMessageReceived(this, message, _disposed.Token).ConfigureAwait(false);
+			} catch (Exception ex) {
+				_logger.LogError(ex,
+					"Exception with subscriber receiving message {name}", Name);
+				NotifySubscriptionDropped(SubscriptionDroppedReason.SubscriberError, ex);
+				throw;
+			}
+		}
+	}
+
+	private void NotifySubscriptionDropped(SubscriptionDroppedReason reason, Exception? exception = null) {
+		if (_notificationRaised.CompareExchange(true, false)) {
+			return;
+		}
+		try {
+			_logger.LogInformation(exception, "All stream subscription dropped {name}. Reason: {reason}", Name, reason);
+			_subscriptionDropped.Invoke(this, reason, exception);
+		} catch (Exception ex) {
+			_logger.LogError(
+				ex,
+				"Error notifying subscriber that subscription has been dropped ({name}).", Name);
+		}
+	}
 }

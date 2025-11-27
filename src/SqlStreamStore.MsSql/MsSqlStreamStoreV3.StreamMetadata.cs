@@ -1,110 +1,99 @@
-﻿namespace SqlStreamStore
-{
-    using System.Data;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.Data.SqlClient;
-    using SqlStreamStore.Streams;
-    using SqlStreamStore.Infrastructure;
-    using StreamStoreStore.Json;
+﻿namespace SqlStreamStore;
 
-    public partial class MsSqlStreamStoreV3
-    {
-        protected override async Task<StreamMetadataResult> GetStreamMetadataInternal(
-            string streamId,
-            CancellationToken cancellationToken)
-        {
-            var streamIdInfo = new StreamIdInfo(streamId);
+using System.Data;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.Streams;
 
-            ReadStreamPage page;
-            using (var connection = _createConnection())
-            {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                (page, _) = await ReadStreamInternal(
-                    streamIdInfo.MetadataSqlStreamId,
-                    StreamVersion.End,
-                    1,
-                    ReadDirection.Backward,
-                    true,
-                    null,
-                    connection,
-                    null,
-                    cancellationToken);
-            }
+public partial class MsSqlStreamStoreV3 {
+	protected override async Task<StreamMetadataResult> GetStreamMetadataInternal(
+		string streamId,
+		CancellationToken cancellationToken) {
+		var streamIdInfo = new StreamIdInfo(streamId);
 
-            if(page.Status == PageReadStatus.StreamNotFound)
-            {
-                return new StreamMetadataResult(streamId, -1);
-            }
+		ReadStreamPage page;
+		using (var connection = _createConnection()) {
+			await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+			(page, _) = await ReadStreamInternal(
+				streamIdInfo.MetadataSqlStreamId,
+				StreamVersion.End,
+				1,
+				ReadDirection.Backward,
+				true,
+				null!,
+				connection,
+				null,
+				cancellationToken);
+		}
 
-            var metadataMessage = await page.Messages[0].GetJsonDataAs<MetadataMessage>(cancellationToken);
+		if (page.Status == PageReadStatus.StreamNotFound) {
+			return new StreamMetadataResult(streamId, -1);
+		}
 
-            return new StreamMetadataResult(
-                   streamId,
-                   page.LastStreamVersion,
-                   metadataMessage.MaxAge,
-                   metadataMessage.MaxCount,
-                   metadataMessage.MetaJson);
-        }
+		var metadataMessage = await page.Messages[0].GetJsonDataAs<MetadataMessage>(cancellationToken);
 
-        protected override async Task<SetStreamMetadataResult> SetStreamMetadataInternal(
-            string streamId,
-            int expectedStreamMetadataVersion,
-            int? maxAge,
-            int? maxCount,
-            string metadataJson,
-            CancellationToken cancellationToken)
-        {
-            MsSqlAppendResult result;
-            using(var connection = _createConnection())
-            {
-                var streamIdInfo = new StreamIdInfo(streamId);
+		return new StreamMetadataResult(
+			streamId,
+			page.LastStreamVersion,
+			metadataMessage.MaxAge,
+			metadataMessage.MaxCount,
+			metadataMessage.MetaJson);
+	}
 
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+	protected override async Task<SetStreamMetadataResult> SetStreamMetadataInternal(
+		string streamId,
+		int expectedStreamMetadataVersion,
+		int? maxAge,
+		int? maxCount,
+		string? metadataJson,
+		CancellationToken cancellationToken) {
+		MsSqlAppendResult result;
+		using (var connection = _createConnection()) {
+			var streamIdInfo = new StreamIdInfo(streamId);
 
-                using(var transaction = connection.BeginTransaction())
-                {
-                    var metadataMessage = new MetadataMessage
-                    {
-                        StreamId = streamId,
-                        MaxAge = maxAge,
-                        MaxCount = maxCount,
-                        MetaJson = metadataJson
-                    };
-                    var json = SimpleJson.SerializeObject(metadataMessage);
-                    var messageId = MetadataMessageIdGenerator.Create(
-                        streamId,
-                        expectedStreamMetadataVersion,
-                        json);
-                    var newStreamMessage = new NewStreamMessage(messageId, "$stream-metadata", json);
+			await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-                    result = await AppendToStreamInternal(
-                        connection,
-                        transaction,
-                        streamIdInfo.MetadataSqlStreamId,
-                        expectedStreamMetadataVersion,
-                        new[] { newStreamMessage },
-                        cancellationToken);
+			using (var transaction = connection.BeginTransaction()) {
+				var metadataMessage = new MetadataMessage {
+					StreamId = streamId,
+					MaxAge = maxAge,
+					MaxCount = maxCount,
+					MetaJson = metadataJson
+				};
+				var json = SimpleJson.SerializeObject(metadataMessage);
+				var messageId = MetadataMessageIdGenerator.Create(
+					streamId,
+					expectedStreamMetadataVersion,
+					json);
+				var newStreamMessage = new NewStreamMessage(messageId, "$stream-metadata", json);
 
-                    using(var command = new SqlCommand(_scripts.SetStreamMetadata, connection, transaction))
-                    {
-                        command.CommandTimeout = _commandTimeout;
-                        command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = streamIdInfo.SqlStreamId.Id });
-                        command.Parameters.AddWithValue("streamIdOriginal", streamIdInfo.SqlStreamId.IdOriginal);
-                        command.Parameters.Add("maxAge", SqlDbType.Int);
-                        command.Parameters["maxAge"].Value = maxAge ?? -1;
-                        command.Parameters.Add("maxCount", SqlDbType.Int);
-                        command.Parameters["maxCount"].Value = maxCount ?? -1;
-                        await command.ExecuteNonQueryAsync(cancellationToken);
-                    }
+				result = await AppendToStreamInternal(
+					connection,
+					transaction,
+					streamIdInfo.MetadataSqlStreamId,
+					expectedStreamMetadataVersion,
+					new[] { newStreamMessage },
+					cancellationToken);
 
-                    transaction.Commit();
-                }
-            }
+				using (var command = new SqlCommand(_scripts.SetStreamMetadata, connection, transaction)) {
+					command.CommandTimeout = _commandTimeout;
+					command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = streamIdInfo.SqlStreamId.Id });
+					command.Parameters.AddWithValue("streamIdOriginal", streamIdInfo.SqlStreamId.IdOriginal);
+					command.Parameters.Add("maxAge", SqlDbType.Int);
+					command.Parameters["maxAge"].Value = maxAge ?? -1;
+					command.Parameters.Add("maxCount", SqlDbType.Int);
+					command.Parameters["maxCount"].Value = maxCount ?? -1;
+					await command.ExecuteNonQueryAsync(cancellationToken);
+				}
 
-            await CheckStreamMaxCount(streamId, maxCount, cancellationToken);
+				transaction.Commit();
+			}
+		}
 
-            return new SetStreamMetadataResult(result.CurrentVersion);
-        }
-    }
+		await CheckStreamMaxCount(streamId, maxCount, cancellationToken);
+
+		return new SetStreamMetadataResult(result.CurrentVersion);
+	}
 }

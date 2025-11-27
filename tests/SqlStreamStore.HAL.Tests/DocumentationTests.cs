@@ -1,90 +1,87 @@
-namespace SqlStreamStore.HAL.Tests
-{
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Linq;
-    using System.Net;
-    using System.Net.Http;
-    using System.Net.Http.Headers;
-    using System.Threading.Tasks;
-    using Shouldly;
-    using SqlStreamStore.HAL.StreamMessage;
-    using SqlStreamStore.HAL.StreamMetadata;
-    using SqlStreamStore.HAL.Streams;
-    using Xunit;
-    using Xunit.Abstractions;
+namespace SqlStreamStore.HAL.Tests;
 
-    public class DocumentationTests : IDisposable
-    {
-        private static readonly MediaTypeWithQualityHeaderValue[] s_MarkdownMediaTypes =
-        {
-            new MediaTypeWithQualityHeaderValue(Constants.MediaTypes.TextMarkdown), 
-            new MediaTypeWithQualityHeaderValue(Constants.MediaTypes.TextMarkdown)
-            {
-                CharSet = "utf-8"
-            },
-            new MediaTypeWithQualityHeaderValue(Constants.MediaTypes.Any) 
-        };
-        private static readonly IDictionary<string, Type> s_documentedRels = new Dictionary<string, Type>
-        {
-            ["append"] = typeof(StreamResource),
-            ["delete-stream"] = typeof(StreamResource),
-            ["delete-message"] = typeof(StreamMessageResource),
-            ["metadata"] = typeof(StreamMetadataResource)
-        };
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using Shouldly;
+using SqlStreamStore.HAL.StreamMessage;
+using SqlStreamStore.HAL.StreamMetadata;
+using SqlStreamStore.HAL.Streams;
+using Xunit;
+using Xunit.Abstractions;
 
-        private readonly SqlStreamStoreHalMiddlewareFixture _fixture;
+public class DocumentationTests : IDisposable {
+	private static readonly MediaTypeWithQualityHeaderValue[] s_MarkdownMediaTypes =
+	{
+		new(Constants.MediaTypes.TextMarkdown),
+		new(Constants.MediaTypes.TextMarkdown)
+		{
+			CharSet = "utf-8"
+		},
+		new(Constants.MediaTypes.Any)
+	};
 
-        public DocumentationTests(ITestOutputHelper output)
-        {
-            _fixture = new SqlStreamStoreHalMiddlewareFixture(output);
-        }
+	private static readonly IDictionary<string, Type> s_documentedRels = new Dictionary<string, Type> {
+		["append"] = typeof(StreamResource),
+		["delete-stream"] = typeof(StreamResource),
+		["delete-message"] = typeof(StreamMessageResource),
+		["metadata"] = typeof(StreamMetadataResource)
+	};
 
-        public static IEnumerable<object[]> DocumentationCases()
-            => from pair in s_documentedRels
-                from mediaType in s_MarkdownMediaTypes
-                select new object[]
-                {
-                    pair.Key,
-                    mediaType,
-                    pair.Value.Assembly.GetManifestResourceStream(pair.Value, $"Schema.{pair.Key}.schema.md")
-                };
+	private readonly SqlStreamStoreHalMiddlewareFixture _fixture;
 
-        [Fact]
-        public async Task documentation_not_found()
-        {
-            using(var response = await _fixture.HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/docs/{Guid.NewGuid()}")
-            {
-                Headers = { Accept = { MediaTypeWithQualityHeaderValue.Parse(Constants.MediaTypes.TextMarkdown) } }
-            }))
-            {
-                response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-            }
-        }
+	public DocumentationTests(ITestOutputHelper output) {
+		_fixture = new SqlStreamStoreHalMiddlewareFixture(output);
+	}
 
-        [Theory, MemberData(nameof(DocumentationCases))]
-        public async Task documentation(string rel, MediaTypeWithQualityHeaderValue accept, Stream content)
-        {
-            content.ShouldNotBeNull();
-            
-            using (var expectedDocument = new MemoryStream())
-            using (var actualDocument = new MemoryStream())
-            using(var response = await _fixture.HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/docs/{rel}")
-            {
-                Headers = { Accept = { accept } }
-            }))
-            {
-                response.StatusCode.ShouldBe(HttpStatusCode.OK);
+	public static IEnumerable<object[]> DocumentationCases()
+		=> from pair in s_documentedRels
+			from mediaType in s_MarkdownMediaTypes
+			let manifestName = $"Schema.{pair.Key}.schema.md"
+			select new object[]
+			{
+				pair.Key,
+				mediaType,
+				pair.Value.Assembly.GetManifestResourceStream(pair.Value, manifestName)?? throw new Exception($"Missing {pair.Key} manifest resource")
+			};
 
-                await content.CopyToAsync(expectedDocument);
+	[Fact]
+	public async Task documentation_not_found() {
+		using (var response = await _fixture.HttpClient.SendAsync(
+			       new HttpRequestMessage(HttpMethod.Get, $"/docs/{Guid.NewGuid()}") {
+				       Headers =
+				       {
+					       Accept = { MediaTypeWithQualityHeaderValue.Parse(Constants.MediaTypes.TextMarkdown) }
+				       }
+			       })) {
+			response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+		}
+	}
 
-                await response.Content.CopyToAsync(actualDocument);
-                
-                expectedDocument.ToArray().ShouldBe(actualDocument.ToArray());
-            }
-        }
+	[Theory, MemberData(nameof(DocumentationCases))]
+	public async Task documentation(string rel, MediaTypeWithQualityHeaderValue accept, Stream content) {
+		content.ShouldNotBeNull();
 
-        public void Dispose() => _fixture.Dispose();
-    }
+		using (var expectedDocument = new MemoryStream())
+		using (var actualDocument = new MemoryStream())
+		using (var response = await _fixture.HttpClient.SendAsync(
+			       new HttpRequestMessage(HttpMethod.Get, $"/docs/{rel}") {
+				       Headers = { Accept = { accept } }
+			       })) {
+			response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+			await content.CopyToAsync(expectedDocument);
+
+			await response.Content.CopyToAsync(actualDocument);
+
+			expectedDocument.ToArray().ShouldBe(actualDocument.ToArray());
+		}
+	}
+
+	public void Dispose() => _fixture.Dispose();
 }

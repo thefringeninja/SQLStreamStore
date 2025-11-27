@@ -1,163 +1,145 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Linq;
-    using System.Net;
-    using System.Net.Http;
-    using System.Net.Http.Headers;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Serialization;
-    using SqlStreamStore.Internal.HoneyBearHalClient;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
-    using SqlStreamStore.Streams;
-    using SqlStreamStore.Subscriptions;
+﻿namespace SqlStreamStore;
 
-    public sealed partial class HttpClientSqlStreamStore : IStreamStore
-    {
-        private static readonly JsonSerializer s_serializer = JsonSerializer.Create(new JsonSerializerSettings
-        {
-            TypeNameHandling = TypeNameHandling.None,
-            ContractResolver = new CamelCasePropertyNamesContractResolver(),
-            Converters =
-            {
-                new NewStreamMessageConverter()
-            }
-        });
+using System;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+using SqlStreamStore.Streams;
+using SqlStreamStore.Subscriptions;
 
-        private readonly Lazy<IStreamStoreNotifier> _streamStoreNotifier;
-        private readonly HttpClientSqlStreamStoreSettings _settings;
-        private bool _disposed;
+public sealed partial class HttpClientSqlStreamStore : IStreamStore {
+	private static readonly JsonSerializerOptions s_serializer = new() {
+		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+		Converters =
+		{
+			new NewStreamMessageConverter()
+		}
+	};
 
-        public HttpClientSqlStreamStore(HttpClientSqlStreamStoreSettings settings)
-        {
-            _settings = settings;
-            _streamStoreNotifier = new Lazy<IStreamStoreNotifier>(() =>
-            {
-                if(settings.CreateStreamStoreNotifier == null)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot create notifier because supplied createStreamStoreNotifier was null");
-                }
+	private readonly Lazy<IStreamStoreNotifier> _streamStoreNotifier;
+	private readonly HttpClientSqlStreamStoreSettings _settings;
+	private bool _disposed;
 
-                return settings.CreateStreamStoreNotifier.Invoke(this);
-            });
-        }
+	public HttpClientSqlStreamStore(HttpClientSqlStreamStoreSettings settings) {
+		_settings = settings;
+		_streamStoreNotifier = new Lazy<IStreamStoreNotifier>(() => {
+			if (settings.CreateStreamStoreNotifier == null) {
+				throw new InvalidOperationException(
+					"Cannot create notifier because supplied createStreamStoreNotifier was null");
+			}
 
-        public void Dispose()
-        {
-            _disposed = true;
-            OnDispose?.Invoke();
-        }
+			return settings.CreateStreamStoreNotifier.Invoke(this);
+		});
+	}
 
-        public async Task<long> ReadHeadPosition(CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+	public void Dispose() {
+		_disposed = true;
+		OnDispose?.Invoke();
+	}
 
-            var client = CreateClient();
-            var response = await client.Client.HeadAsync(LinkFormatter.AllStream(), cancellationToken);
+	public async Task<long> ReadHeadPosition(CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-            response.EnsureSuccessStatusCode();
+		var client = CreateClient();
+		var response = await client.Client.HeadAsync(LinkFormatter.AllStream(), cancellationToken);
 
-            response.Headers.TryGetValues(Constants.Headers.HeadPosition, out var headPositionHeaders);
+		response.EnsureSuccessStatusCode();
 
-            if(!long.TryParse(headPositionHeaders.Single(), out var headPosition))
-            {
-                throw new InvalidOperationException();
-            }
+		if (!response.Headers.TryGetValues(Constants.Headers.HeadPosition, out var headPositionHeaders)) {
+			throw new InvalidOperationException();
+		}
 
-            return headPosition;
-        }
+		if (!long.TryParse(headPositionHeaders.Single(), out var headPosition)) {
+			throw new InvalidOperationException();
+		}
 
-        public async Task<long> ReadStreamHeadPosition(StreamId streamId, CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+		return headPosition;
+	}
 
-            return (await ReadStreamBackwards(streamId, StreamVersion.End, 1, false, cancellationToken)).LastStreamPosition;
-        }
+	public async Task<long> ReadStreamHeadPosition(StreamId streamId, CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-        public async Task<int> ReadStreamHeadVersion(StreamId streamId, CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+		return (await ReadStreamBackwards(streamId, StreamVersion.End, 1, false, cancellationToken)).LastStreamPosition;
+	}
 
-            return (await ReadStreamBackwards(streamId, StreamVersion.End, 1, false, cancellationToken)).LastStreamVersion;
-        }
+	public async Task<int> ReadStreamHeadVersion(StreamId streamId, CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-        private static void ThrowOnError(IHalClient client)
-        {
-            switch(client.StatusCode ?? default)
-            {
-                case default(HttpStatusCode):
-                    return;
-                case HttpStatusCode.Conflict:
-                    var resource = client.Current.First();
-                    throw new WrongExpectedVersionException(resource.Data<HttpError>().Detail);
-                case var status when status >= HttpStatusCode.BadRequest:
-                    throw new HttpRequestException($"Response status code does not indicate success: {status}");
-                default:
-                    return;
-            }
-        }
+		return (await ReadStreamBackwards(streamId, StreamVersion.End, 1, false, cancellationToken)).LastStreamVersion;
+	}
 
-        public event Action OnDispose;
+	private static void ThrowOnError(IHalClient client) {
+		switch (client.StatusCode ?? default) {
+			case default(HttpStatusCode):
+				return;
+			case HttpStatusCode.Conflict:
+				var resource = client.Current.First();
+				throw new WrongExpectedVersionException(resource.Data<HttpError>().Detail);
+			case var status when status >= HttpStatusCode.BadRequest:
+				throw new HttpRequestException($"Response status code does not indicate success: {status}");
+			default:
+				return;
+		}
+	}
 
-        private IHalClient CreateClient(IResource resource) =>
-            new HalClient(
-                CreateClient(),
-                new[] { resource.WithBaseAddress(_settings.BaseAddress) });
+	public event Action? OnDispose;
 
-        private IHalClient CreateClient() => new HalClient(CreateHttpClient, s_serializer, _settings.BaseAddress);
+	private IHalClient CreateClient(IResource resource) =>
+		new HalClient(
+			CreateClient(),
+			new[] { resource.WithBaseAddress(_settings.BaseAddress) });
 
-        private static StreamMessage[] Convert(IResource[] streamMessages, IHalClient client, bool prefetch = false)
-            => Array.ConvertAll(
-                streamMessages,
-                streamMessage =>
-                {
-                    var httpStreamMessage = streamMessage.Data<HttpStreamMessage>();
+	private IHalClient CreateClient() => new HalClient(CreateHttpClient, s_serializer, _settings.BaseAddress);
 
-                    return httpStreamMessage.ToStreamMessage(
-                        ct =>
-                            prefetch
-                                ? Task.FromResult(httpStreamMessage.Payload.ToString())
-                                : Task.Run(() => GetPayload(client, streamMessage, ct), ct));
-                });
+	private static StreamMessage[] Convert(IResource[] streamMessages, IHalClient client, bool prefetch = false)
+		=> Array.ConvertAll(
+			streamMessages,
+			streamMessage => {
+				var httpStreamMessage = streamMessage.Data<HttpStreamMessage>();
 
-        private static async Task<string> GetPayload(
-            IHalClient client,
-            IResource streamMessage,
-            CancellationToken cancellationToken)
-            => (await client.GetAsync(streamMessage, Constants.Relations.Self, cancellationToken))
-                .Current.FirstOrDefault()?.Data<HttpStreamMessage>()?.Payload?.ToString();
+				return httpStreamMessage.ToStreamMessage(
+					ct =>
+						prefetch
+							? Task.FromResult(httpStreamMessage.Payload?.ToString())
+							: Task.Run(() => GetPayload(client, streamMessage, ct), ct));
+			});
 
-        private HttpClient CreateHttpClient()
-        {
-            var baseAddress = _settings.BaseAddress;
+	private static async Task<string?> GetPayload(
+		IHalClient client,
+		IResource streamMessage,
+		CancellationToken cancellationToken) =>
+		(await client.GetAsync(streamMessage, Constants.Relations.Self, cancellationToken))
+		.Current.FirstOrDefault()?.Data<HttpStreamMessage>()
+		.Payload?.ToString();
 
-            if(baseAddress == null)
-            {
-                throw new ArgumentNullException(nameof(baseAddress));
-            }
+	private HttpClient CreateHttpClient() {
+		var baseAddress = _settings.BaseAddress;
 
-            if(!baseAddress.ToString().EndsWith("/"))
-            {
-                throw new ArgumentException("BaseAddress must end with /", nameof(baseAddress));
-            }
+		if (baseAddress == null) {
+			throw new ArgumentNullException(nameof(baseAddress));
+		}
 
-            var client = _settings.CreateHttpClient();
+		if (!baseAddress.ToString().EndsWith("/")) {
+			throw new ArgumentException("BaseAddress must end with /", nameof(baseAddress));
+		}
 
-            client.BaseAddress = baseAddress;
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/hal+json"));
+		var client = _settings.CreateHttpClient();
 
-            return client;
-        }
+		client.BaseAddress = baseAddress;
+		client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/hal+json"));
 
-        private void GuardAgainstDisposed()
-        {
-            if(_disposed)
-            {
-                throw new ObjectDisposedException(nameof(HttpClientSqlStreamStore));
-            }
-        }
-    }
+		return client;
+	}
+
+	private void GuardAgainstDisposed() {
+		if (_disposed) {
+			throw new ObjectDisposedException(nameof(HttpClientSqlStreamStore));
+		}
+	}
 }

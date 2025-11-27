@@ -1,9 +1,7 @@
-namespace SqlStreamStore
-{
-    internal class HttpError
-    {
-        public string Title { get; set; }
-        public string Detail { get; set; }
-        public string Type { get; set; }
-    }
+namespace SqlStreamStore;
+
+internal class HttpError {
+	public required string Title { get; set; }
+	public required string Detail { get; set; }
+	public required string Type { get; set; }
 }

@@ -1,146 +1,130 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Serialization
-{
-    using System;
-    using System.Collections;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
-    using SqlStreamStore.Internal.HoneyBearHalClient.Models;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient.Serialization;
 
-    internal static class HalResourceJsonReader
-    {
-        public static async Task<IResource> ReadResource(
-            JsonReader reader,
-            CancellationToken cancellationToken = default)
-            => new JResource(await JObject.LoadAsync(reader, cancellationToken));
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Internal.HoneyBearHalClient.Models;
 
-        private class JResource : IResource
-        {
-            private readonly JObject _inner;
+internal static class HalResourceJsonReader {
+	public static async Task<IResource> ReadResource(
+		Stream reader,
+		CancellationToken cancellationToken = default)
+		=> new JResource((await JsonNode.ParseAsync(reader, cancellationToken: cancellationToken))!.AsObject());
 
-            public string Rel { get; set; }
+	private class JResource : IResource {
+		private static readonly Uri s_baseAddress = new UriBuilder().Uri;
+		private readonly JsonObject _inner;
 
-            public string Href
-            {
-                get => _inner.Value<string>("href");
-                set => _inner["href"] = value;
-            }
+		public string? Rel { get; set; }
 
-            public string Name
-            {
-                get => _inner.Value<string>("name");
-                set => _inner["name"] = value;
-            }
+		public string? Href {
+			get => _inner["href"]?.GetValue<string?>();
+			set => _inner["href"] = value;
+		}
 
-            public JResource(JObject inner, string rel = null)
-            {
-                if(inner == null)
-                    throw new ArgumentNullException(nameof(inner));
-                _inner = inner;
-                Rel = rel;
-            }
+		public string? Name {
+			get => _inner["name"]?.GetValue<string>();
+			set => _inner["name"] = value;
+		}
 
-            public IEnumerator<KeyValuePair<string, object>> GetEnumerator()
-                => _inner.Properties()
-                    .Select(x => new KeyValuePair<string, object>(
-                        x.Name,
-                        x.Value))
-                    .GetEnumerator();
+		public JResource(JsonObject inner, string? rel = null) {
+			ArgumentNullException.ThrowIfNull(inner);
+			_inner = inner;
+			Rel = rel;
+			BaseAddress = s_baseAddress;
+		}
 
-            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+		public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+			=> _inner
+				.Select(x => new KeyValuePair<string, object?>(
+					x.Key,
+					x.Value))
+				.GetEnumerator();
 
-            public IList<ILink> Links => GetLinks().ToArray();
-            public IList<IResource> Embedded => GetEmbedded().ToArray();
+		IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-            public Uri BaseAddress { get; private set; }
+		public IList<ILink> Links => GetLinks().ToArray();
+		public IList<IResource> Embedded => GetEmbedded().ToArray();
 
-            public IResource WithBaseAddress(Uri baseAddress)
-                => new JResource(_inner, Rel)
-                {
-                    BaseAddress = baseAddress
-                };
+		public Uri BaseAddress { get; private set; }
 
-            private IEnumerable<ILink> GetLinks()
-            {
-                var links = _inner.Value<JObject>("_links");
+		public IResource WithBaseAddress(Uri baseAddress)
+			=> new JResource(_inner, Rel) {
+				BaseAddress = baseAddress
+			};
 
-                foreach(var property in links.Properties())
-                {
-                    if(property.Value.Type == JTokenType.Array)
-                    {
-                        foreach(var link in ((JArray) property.Value).OfType<JObject>())
-                        {
-                            yield return new JLink(link, property.Name);
-                        }
-                    }
-                    else if(property.Value.Type == JTokenType.Object)
-                    {
-                        yield return new JLink((JObject) property.Value, property.Name);
-                    }
-                }
-            }
+		private IEnumerable<ILink> GetLinks() {
+			var links = _inner["_links"]?.AsObject() ?? [];
 
-            private IEnumerable<IResource> GetEmbedded()
-            {
-                var embedded = _inner.Value<JObject>("_embedded");
+			foreach (var property in links) {
+				switch (property.Value) {
+					case JsonArray array: {
+						foreach (var link in array.OfType<JsonObject>()) {
+							yield return new JLink(link, property.Key);
+						}
 
-                foreach(var property in embedded?.Properties() ?? Enumerable.Empty<JProperty>())
-                {
-                    if(property.Value.Type == JTokenType.Array)
-                    {
-                        foreach(var resource in ((JArray) property.Value).OfType<JObject>())
-                        {
-                            yield return new JResource(resource, property.Name).WithBaseAddress(BaseAddress);
-                        }
-                    }
-                    else if(property.Value.Type == JTokenType.Object)
-                    {
-                        yield return
-                            new JResource((JObject) property.Value, property.Name).WithBaseAddress(BaseAddress);
-                    }
-                }
-            }
-        }
+						break;
+					}
+					case JsonObject o:
+						yield return new JLink(o, property.Key);
+						break;
+				}
+			}
+		}
 
-        private class JLink : ILink
-        {
-            private readonly JObject _inner;
-            public string Rel { get; set; }
+		private IEnumerable<IResource> GetEmbedded() {
+			var embedded = _inner["_embedded"]?.AsObject() ?? [];
 
-            public string Href
-            {
-                get => _inner.Value<string>("href");
-                set => _inner["href"] = value;
-            }
+			foreach (var property in embedded) {
+				switch (property.Value) {
+					case JsonArray array: {
+						foreach (var resource in array.OfType<JsonObject>()) {
+							yield return new JResource(resource, property.Key).WithBaseAddress(BaseAddress);
+						}
 
-            public string Name
-            {
-                get => _inner.Value<string>("name");
-                set => _inner["name"] = value;
-            }
+						break;
+					}
+					case JsonObject o:
+						yield return new JResource(o, property.Key).WithBaseAddress(BaseAddress);
+						break;
+				}
+			}
+		}
+	}
 
-            public bool Templated
-            {
-                get => _inner.Value<bool>("templated");
-                set => _inner["templated"] = value;
-            }
+	private class JLink : ILink {
+		private readonly JsonObject _inner;
+		public string? Rel { get; set; }
 
-            public string Title
-            {
-                get => _inner.Value<string>("title");
-                set => _inner["title"] = value;
-            }
+		public string? Href {
+			get => _inner["href"]?.GetValue<string>();
+			set => _inner["href"] = value;
+		}
 
-            public JLink(JObject inner, string rel)
-            {
-                if(inner == null)
-                    throw new ArgumentNullException(nameof(inner));
-                _inner = inner;
-                Rel = rel;
-            }
-        }
-    }
+		public string? Name {
+			get => _inner["name"]?.GetValue<string>();
+			set => _inner["name"] = value;
+		}
+
+		public bool Templated {
+			get => _inner["templated"]?.GetValue<bool>() ?? false;
+			set => _inner["templated"] = value;
+		}
+
+		public string? Title {
+			get => _inner["title"]?.GetValue<string>();
+			set => _inner["title"] = value;
+		}
+
+		public JLink(JsonObject inner, string rel) {
+			ArgumentNullException.ThrowIfNull(inner);
+			_inner = inner;
+			Rel = rel;
+		}
+	}
 }

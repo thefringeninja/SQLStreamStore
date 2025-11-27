@@ -1,50 +1,42 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Security.Cryptography;
-    using System.Text;
+﻿namespace SqlStreamStore;
 
-    internal struct PostgresqlStreamId : IEquatable<PostgresqlStreamId>
-    {
-        public readonly string Id;
-        public readonly string IdOriginal;
+using System;
+using System.Security.Cryptography;
+using System.Text;
 
-        public PostgresqlStreamId(string idOriginal)
-        {
-            Id = Guid.TryParse(idOriginal, out _)
-                ? idOriginal
-                : ComputeHash(idOriginal);
-            IdOriginal = idOriginal;
-        }
+internal struct PostgresqlStreamId : IEquatable<PostgresqlStreamId> {
+	public readonly string Id;
+	public readonly string IdOriginal;
 
-        private static string ComputeHash(string idOriginal)
-        {
-            using(var sha1 = SHA1.Create())
-            {
-                var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(idOriginal));
-                return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
-            }
-        }
+	public PostgresqlStreamId(string idOriginal) {
+		Id = Guid.TryParse(idOriginal, out _)
+			? idOriginal
+			: ComputeHash(idOriginal);
+		IdOriginal = idOriginal;
+	}
 
-        public static readonly PostgresqlStreamId Deleted
-            = new PostgresqlStreamId(Streams.Deleted.DeletedStreamId);
+	private static string ComputeHash(string idOriginal) {
+		using (var sha1 = SHA1.Create()) {
+			var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(idOriginal));
+			return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+		}
+	}
 
-        public static bool operator ==(PostgresqlStreamId left, PostgresqlStreamId right) => left.Equals(right);
-        public static bool operator !=(PostgresqlStreamId left, PostgresqlStreamId right) => !left.Equals(right);
+	public static readonly PostgresqlStreamId Deleted = new(Streams.Deleted.DeletedStreamId);
 
-        public bool Equals(PostgresqlStreamId other)
-            => string.Equals(Id, other.Id) && string.Equals(IdOriginal, other.IdOriginal);
+	public static bool operator ==(PostgresqlStreamId left, PostgresqlStreamId right) => left.Equals(right);
+	public static bool operator !=(PostgresqlStreamId left, PostgresqlStreamId right) => !left.Equals(right);
 
-        public override bool Equals(object obj) => obj is PostgresqlStreamId other && Equals(other);
+	public bool Equals(PostgresqlStreamId other)
+		=> string.Equals(Id, other.Id) && string.Equals(IdOriginal, other.IdOriginal);
 
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (Id.GetHashCode() * 397) ^ IdOriginal.GetHashCode();
-            }
-        }
+	public override bool Equals(object? obj) => obj is PostgresqlStreamId other && Equals(other);
 
-        public override string ToString() => IdOriginal;
-    }
+	public override int GetHashCode() {
+		unchecked {
+			return (Id.GetHashCode() * 397) ^ IdOriginal.GetHashCode();
+		}
+	}
+
+	public override string ToString() => IdOriginal;
 }

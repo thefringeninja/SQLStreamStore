@@ -1,58 +1,53 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Concurrent;
-    using System.Threading.Tasks;
-    using SqlStreamStore.TestUtils.Postgres;
-    using Xunit;
-    using Xunit.Abstractions;
+﻿namespace SqlStreamStore;
 
-    public class PostgresStreamStoreV3FixturePool : IAsyncLifetime
-    {
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<PostgresStreamStoreFixture>> _fixturePoolBySchema
-            = new ConcurrentDictionary<string, ConcurrentQueue<PostgresStreamStoreFixture>>();
+using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SqlStreamStore.TestUtils.Postgres;
+using Xunit;
 
-        public async Task<PostgresStreamStoreFixture> Get(
-            ITestOutputHelper outputHelper,
-            string schema = "dbo")
-        {
-            var fixturePool = _fixturePoolBySchema.GetOrAdd(
-                schema,
-                _ => new ConcurrentQueue<PostgresStreamStoreFixture>());
+public class PostgresStreamStoreV3FixturePool : IAsyncLifetime {
+	private readonly ConcurrentDictionary<string, ConcurrentQueue<PostgresStreamStoreFixture>> _fixturePoolBySchema =
+		new();
 
-            if (!fixturePool.TryDequeue(out var fixture))
-            {
-                var databaseName = $"test_{Guid.NewGuid():n}";
-                var dockerInstance = new PostgresContainer(databaseName);
-                await dockerInstance.Start();
-                await dockerInstance.CreateDatabase();
+	public async Task<PostgresStreamStoreFixture> Get(
+		ILoggerFactory loggerFactory,
+		string schema = "dbo") {
+		var logger = loggerFactory.CreateLogger<PostgresStreamStoreV3FixturePool>();
 
-                fixture = new PostgresStreamStoreFixture(
-                    schema,
-                    dockerInstance,
-                    databaseName,
-                    onDispose:() => fixturePool.Enqueue(fixture));
+		var fixturePool = _fixturePoolBySchema.GetOrAdd(
+			schema,
+			_ => new ConcurrentQueue<PostgresStreamStoreFixture>());
 
-                outputHelper.WriteLine($"Using new fixture with db {databaseName}");
-            }
-            else
-            {
-                outputHelper.WriteLine($"Using pooled fixture with db {fixture.DatabaseName}");
-            }
+		if (!fixturePool.TryDequeue(out var fixture)) {
+			var databaseName = $"test_{Guid.NewGuid():n}";
+			var dockerInstance = new PostgresContainer(databaseName);
+			await dockerInstance.Start();
+			await dockerInstance.CreateDatabase();
 
-            await fixture.Prepare();
+			fixture = new PostgresStreamStoreFixture(
+				schema,
+				dockerInstance,
+				databaseName,
+				onDispose: () => fixturePool.Enqueue(fixture!),
+				loggerFactory);
 
-            return fixture;
-        }
+			logger.LogInformation("Using new fixture with db {DatabaseName}", databaseName);
+		} else {
+			logger.LogInformation("Using pooled fixture with db {FixtureDatabaseName}", fixture.DatabaseName);
+		}
 
-        public Task InitializeAsync()
-        {
-            return Task.CompletedTask;
-        }
+		await fixture.Prepare();
 
-        public Task DisposeAsync()
-        {
-            return Task.CompletedTask;
-        }
-    }
+		return fixture;
+	}
+
+	public Task InitializeAsync() {
+		return Task.CompletedTask;
+	}
+
+	public Task DisposeAsync() {
+		return Task.CompletedTask;
+	}
 }

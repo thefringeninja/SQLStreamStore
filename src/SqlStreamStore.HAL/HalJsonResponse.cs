@@ -1,40 +1,33 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System.IO;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Halcyon.HAL;
-    using Microsoft.AspNetCore.Http;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Serialization;
+﻿namespace SqlStreamStore.HAL;
 
-    internal class HalJsonResponse : Response
-    {
-        private readonly HALResponse _body;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Hallo;
+using Hallo.Serialization;
+using Microsoft.AspNetCore.Http;
 
-        private static readonly JsonSerializer s_serializer = JsonSerializer.Create(new JsonSerializerSettings
-        {
-            ContractResolver = new CamelCasePropertyNamesContractResolver(),
-            TypeNameHandling = TypeNameHandling.None,
-            NullValueHandling = NullValueHandling.Ignore
-        });
+internal class HalJsonResponse : Response {
+	private readonly HalRepresentation _body;
 
-        public HalJsonResponse(HALResponse body, int statusCode = 200)
-            : base(statusCode, Constants.MediaTypes.HalJson)
-        {
-            _body = body;
-        }
+	protected static readonly JsonSerializerOptions HalJsonSerializerOptions = new() {
+		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+		PropertyNameCaseInsensitive = true,
+		Converters =
+		{
+			new LinksConverter(),
+			new HalRepresentationConverter(),
+			new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)
+		},
+	};
 
-        public override async Task WriteBody(HttpResponse response, CancellationToken cancellationToken)
-        {
-            using(var writer = new JsonTextWriter(new StreamWriter(response.Body))
-            {
-                CloseOutput = false
-            })
-            {
-                await _body.ToJObject(s_serializer).WriteToAsync(writer, cancellationToken);
-                await writer.FlushAsync(cancellationToken);
-            }
-        }
-    }
+	public HalJsonResponse(HalRepresentation body, int statusCode = 200)
+		: base(statusCode, Constants.MediaTypes.HalJson) {
+		_body = body;
+	}
+
+	public override async Task WriteBody(HttpResponse response, CancellationToken cancellationToken) {
+		await JsonSerializer.SerializeAsync(response.Body, _body, HalJsonSerializerOptions, cancellationToken);
+	}
 }

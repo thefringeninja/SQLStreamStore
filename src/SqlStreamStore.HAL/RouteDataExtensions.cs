@@ -1,32 +1,30 @@
-namespace SqlStreamStore.HAL
-{
-    using System;
-    using Microsoft.AspNetCore.Routing;
+namespace SqlStreamStore.HAL;
 
-    internal static class RouteDataExtensions
-    {
-        public static string GetStreamId(this RouteData routeData)
-            => routeData.Values["streamId"]?.ToString().Unescape();
+using System;
+using Microsoft.AspNetCore.Routing;
 
-        public static long GetPosition(this RouteData routeData)
-            => long.TryParse(routeData.Values["position"]?.ToString(), out var value)
-                ? value
-                : default;
+internal static class RouteDataExtensions {
+	public static string GetStreamId(this RouteData routeData)
+		=> routeData.Values["streamId"]!.ToString()!.Unescape();
 
-        public static int GetStreamVersion(this RouteData routeData)
-            => int.TryParse(routeData.Values["p"]?.ToString(), out var value)
-                ? value
-                : default;
+	public static long GetPosition(this RouteData routeData)
+		=> long.TryParse(routeData.Values["position"]?.ToString(), out var value)
+			? value
+			: default;
 
-        public static Guid GetMessageId(this RouteData routeData)
-            => Guid.TryParse(routeData.Values["p"]?.ToString(), out var value)
-                ? value
-                : default;
+	public static int GetStreamVersion(this RouteData routeData)
+		=> int.TryParse(routeData.Values["p"]?.ToString(), out var value)
+			? value
+			: default;
 
-        public static string GetDoc(this RouteData routeData)
-            => routeData.Values["doc"]?.ToString();
+	public static Guid GetMessageId(this RouteData routeData)
+		=> Guid.TryParse(routeData.Values["p"]?.ToString(), out var value)
+			? value
+			: default;
 
-        private static string Unescape(this string s)
-            => Uri.UnescapeDataString(s);
-    }
+	public static string GetDoc(this RouteData routeData)
+		=> routeData.Values["doc"]!.ToString()!;
+
+	private static string Unescape(this string s)
+		=> Uri.UnescapeDataString(s);
 }

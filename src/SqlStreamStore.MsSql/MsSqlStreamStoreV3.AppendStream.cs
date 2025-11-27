@@ -1,535 +1,466 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Data;
-    using System.Linq;
-    using System.Runtime.ExceptionServices;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.Data.SqlClient;
-    using Microsoft.Data.SqlClient.Server;
-    using SqlStreamStore.Imports.Ensure.That;
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore;
 
-    public partial class MsSqlStreamStoreV3
-    {
-        private class MsSqlAppendResult
-        {
-            public readonly int? MaxCount;
-            public readonly int CurrentVersion;
-            public readonly long CurrentPosition;
-            public readonly bool WasIdempotent;
+using System;
+using System.Data;
+using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient.Server;
+using SqlStreamStore.Streams;
 
-            public MsSqlAppendResult(
-                int? maxCount,
-                int currentVersion,
-                long currentPosition,
-                bool wasIdempotent)
-            {
-                MaxCount = maxCount;
-                CurrentVersion = currentVersion;
-                CurrentPosition = currentPosition;
-                WasIdempotent = wasIdempotent;
-            }
-        }
+public partial class MsSqlStreamStoreV3 {
+	private class MsSqlAppendResult {
+		public readonly int? MaxCount;
+		public readonly int CurrentVersion;
+		public readonly long CurrentPosition;
+		public readonly bool WasIdempotent;
 
-        protected override async Task<AppendResult> AppendToStreamInternal(
-           string streamId,
-           int expectedVersion,
-           NewStreamMessage[] messages,
-           CancellationToken cancellationToken)
-        {
-            Ensure.That(streamId, "streamId").IsNotNullOrWhiteSpace();
-            Ensure.That(expectedVersion, "expectedVersion").IsGte(ExpectedVersion.NoStream);
-            Ensure.That(messages, "Messages").IsNotNull();
-            GuardAgainstDisposed();
+		public MsSqlAppendResult(
+			int? maxCount,
+			int currentVersion,
+			long currentPosition,
+			bool wasIdempotent) {
+			MaxCount = maxCount;
+			CurrentVersion = currentVersion;
+			CurrentPosition = currentPosition;
+			WasIdempotent = wasIdempotent;
+		}
+	}
 
-            MsSqlAppendResult result;
-            using(var connection = _createConnection())
-            {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                var streamIdInfo = new StreamIdInfo(streamId);
-                result = await AppendToStreamInternal(
-                    connection,
-                    null,
-                    streamIdInfo.SqlStreamId,
-                    expectedVersion,
-                    messages,
-                    cancellationToken);
-            }
+	protected override async Task<AppendResult> AppendToStreamInternal(
+		string streamId,
+		int expectedVersion,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		ArgumentException.ThrowIfNullOrWhiteSpace(streamId);
+		ArgumentOutOfRangeException.ThrowIfLessThan(expectedVersion, ExpectedVersion.NoStream);
+		ArgumentNullException.ThrowIfNull(messages);
+		GuardAgainstDisposed();
 
-            if(result.MaxCount.HasValue && result.MaxCount.Value > 0)
-            {
-                await CheckStreamMaxCount(streamId, result.MaxCount, cancellationToken);
-            }
+		MsSqlAppendResult result;
+		using (var connection = _createConnection()) {
+			await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+			var streamIdInfo = new StreamIdInfo(streamId);
+			result = await AppendToStreamInternal(
+				connection,
+				null!,
+				streamIdInfo.SqlStreamId,
+				expectedVersion,
+				messages,
+				cancellationToken);
+		}
 
-            return new AppendResult(result.CurrentVersion, result.CurrentPosition);
-        }
+		if (result.MaxCount.HasValue && result.MaxCount.Value > 0) {
+			await CheckStreamMaxCount(streamId, result.MaxCount, cancellationToken);
+		}
 
-        private Task<MsSqlAppendResult> AppendToStreamInternal(
-           SqlConnection connection,
-           SqlTransaction transaction,
-           SqlStreamId sqlStreamId,
-           int expectedVersion,
-           NewStreamMessage[] messages,
-           CancellationToken cancellationToken)
-        {
-            GuardAgainstDisposed();
+		return new AppendResult(result.CurrentVersion, result.CurrentPosition);
+	}
 
-            return RetryOnDeadLock(() =>
-            {
-                if(expectedVersion == ExpectedVersion.Any)
-                {
-                    return AppendToStreamExpectedVersionAny(
-                        connection,
-                        transaction,
-                        sqlStreamId,
-                        messages,
-                        cancellationToken);
-                }
-                if(expectedVersion == ExpectedVersion.NoStream)
-                {
-                    return AppendToStreamExpectedVersionNoStream(
-                        connection,
-                        transaction,
-                        sqlStreamId,
-                        messages,
-                        cancellationToken);
-                }
-                if(expectedVersion == ExpectedVersion.EmptyStream)
-                {
-                    return AppendToStreamExpectedVersion(
-                        connection,
-                        transaction,
-                        sqlStreamId,
-                        -1,
-                        messages,
-                        cancellationToken);
-                }
-                return  AppendToStreamExpectedVersion(
-                    connection,
-                    transaction,
-                    sqlStreamId,
-                    expectedVersion,
-                    messages,
-                    cancellationToken);
-            });
-        }
+	private Task<MsSqlAppendResult> AppendToStreamInternal(
+		SqlConnection connection,
+		SqlTransaction transaction,
+		SqlStreamId sqlStreamId,
+		int expectedVersion,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		GuardAgainstDisposed();
 
-        // Deadlocks appear to be a fact of life when there is high contention on a table regardless of
-        // transaction isolation settings.
-        private static async Task<T> RetryOnDeadLock<T>(Func<Task<T>> operation)
-        {
-            int maxRetries = 2; //TODO too much? too little? configurable?
-            Exception exception;
+		return RetryOnDeadLock(() => {
+			if (expectedVersion == ExpectedVersion.Any) {
+				return AppendToStreamExpectedVersionAny(
+					connection,
+					transaction,
+					sqlStreamId,
+					messages,
+					cancellationToken);
+			}
+			if (expectedVersion == ExpectedVersion.NoStream) {
+				return AppendToStreamExpectedVersionNoStream(
+					connection,
+					transaction,
+					sqlStreamId,
+					messages,
+					cancellationToken);
+			}
+			if (expectedVersion == ExpectedVersion.EmptyStream) {
+				return AppendToStreamExpectedVersion(
+					connection,
+					transaction,
+					sqlStreamId,
+					-1,
+					messages,
+					cancellationToken);
+			}
+			return AppendToStreamExpectedVersion(
+				connection,
+				transaction,
+				sqlStreamId,
+				expectedVersion,
+				messages,
+				cancellationToken);
+		});
+	}
 
-            int retryCount = 0;
-            do
-            {
-                try
-                {
-                    return await operation();
-                }
-                catch(SqlException ex) when(ex.Number == 1205 || ex.Number == 1222) // Deadlock error codes;
-                {
-                    exception = ex;
-                    retryCount++;
-                }
-            } while(retryCount < maxRetries);
+	// Deadlocks appear to be a fact of life when there is high contention on a table regardless of
+	// transaction isolation settings.
+	private static async Task<T> RetryOnDeadLock<T>(Func<Task<T>> operation) {
+		int maxRetries = 2; //TODO too much? too little? configurable?
+		Exception exception;
 
-            ExceptionDispatchInfo.Capture(exception).Throw();
-            return default(T); // never actually run
-        }
+		int retryCount = 0;
+		do {
+			try {
+				return await operation();
+			} catch (SqlException ex) when (ex.Number == 1205 || ex.Number == 1222) // Deadlock error codes;
+			{
+				exception = ex;
+				retryCount++;
+			}
+		} while (retryCount < maxRetries);
 
-        private async Task<MsSqlAppendResult> AppendToStreamExpectedVersionAny(
-            SqlConnection connection,
-            SqlTransaction transaction,
-            SqlStreamId sqlStreamId,
-            NewStreamMessage[] messages,
-            CancellationToken cancellationToken)
-        {
-            using(var command = new SqlCommand(_scripts.AppendStreamExpectedVersionAny, connection, transaction))
-            {
-                command.CommandTimeout = _commandTimeout;
-                command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
-                command.Parameters.AddWithValue("streamIdOriginal", sqlStreamId.IdOriginal);
+		ExceptionDispatchInfo.Capture(exception).Throw();
+		return default(T); // never actually run
+	}
 
-                if (messages.Any())
-                {
-                    var sqlDataRecords = CreateSqlDataRecords(messages);
-                    var eventsParam = CreateNewMessagesSqlParameter(sqlDataRecords);
-                    command.Parameters.Add(eventsParam);
-                    command.Parameters.AddWithValue("hasMessages", true);
-                }
-                else
-                {
-                    // Must use a null value for the table-valued param if there are no records
-                    var eventsParam = CreateNewMessagesSqlParameter(null);
-                    command.Parameters.Add(eventsParam);
-                    command.Parameters.AddWithValue("hasMessages", false);
-                }
+	private async Task<MsSqlAppendResult> AppendToStreamExpectedVersionAny(
+		SqlConnection connection,
+		SqlTransaction transaction,
+		SqlStreamId sqlStreamId,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		using (var command = new SqlCommand(_scripts.AppendStreamExpectedVersionAny, connection, transaction)) {
+			command.CommandTimeout = _commandTimeout;
+			command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
+			command.Parameters.AddWithValue("streamIdOriginal", sqlStreamId.IdOriginal);
 
-                try
-                {
-                    using(var reader = await command
-                        .ExecuteReaderAsync(cancellationToken)
-                        .ConfigureAwait(false))
-                    {
-                        await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+			if (messages.Any()) {
+				var sqlDataRecords = CreateSqlDataRecords(messages);
+				var eventsParam = CreateNewMessagesSqlParameter(sqlDataRecords);
+				command.Parameters.Add(eventsParam);
+				command.Parameters.AddWithValue("hasMessages", true);
+			} else {
+				// Must use a null value for the table-valued param if there are no records
+				var eventsParam = CreateNewMessagesSqlParameter(null);
+				command.Parameters.Add(eventsParam);
+				command.Parameters.AddWithValue("hasMessages", false);
+			}
 
-                        var currentVersion = reader.GetInt32(0);
-                        var currentPosition = reader.GetInt64(1);
-                        var maxCount = reader.GetNullableInt32(2);
+			try {
+				using (var reader = await command
+					       .ExecuteReaderAsync(cancellationToken)
+					       .ConfigureAwait(false)) {
+					await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-                        return new MsSqlAppendResult(maxCount, currentVersion, currentPosition, false);
-                    }
-                }
+					var currentVersion = reader.GetInt32(0);
+					var currentPosition = reader.GetInt64(1);
+					var maxCount = reader.GetNullableInt32(2);
 
-                // Check for unique constraint violation on
-                // https://technet.microsoft.com/en-us/library/aa258747%28v=sql.80%29.aspx
-                catch(SqlException ex)
-                    when(ex.IsUniqueConstraintViolationOnIndex("IX_Messages_StreamIdInternal_Id"))
-                {
-                    var streamVersion = await GetStreamVersionOfMessageId(
-                        connection,
-                        transaction,
-                        sqlStreamId,
-                        messages[0].MessageId,
-                        cancellationToken);
+					return new MsSqlAppendResult(maxCount, currentVersion, currentPosition, false);
+				}
+			}
 
-                    // Idempotency handling. Check if the Messages have already been written.
-                    var (page, meta) = await ReadStreamInternal(
-                        sqlStreamId,
-                        streamVersion,
-                        messages.Length,
-                        ReadDirection.Forward,
-                        false,
-                        null,
-                        connection,
-                        transaction,
-                        cancellationToken)
-                        .ConfigureAwait(false);
+			// Check for unique constraint violation on
+			// https://technet.microsoft.com/en-us/library/aa258747%28v=sql.80%29.aspx
+			catch (SqlException ex)
+				when (ex.IsUniqueConstraintViolationOnIndex("IX_Messages_StreamIdInternal_Id")) {
+				var streamVersion = await GetStreamVersionOfMessageId(
+					connection,
+					transaction,
+					sqlStreamId,
+					messages[0].MessageId,
+					cancellationToken);
 
-                    if(messages.Length > page.Messages.Length)
-                    {
-                        throw new WrongExpectedVersionException(
-                            ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.Any),
-                            sqlStreamId.IdOriginal,
-                            ExpectedVersion.Any,
-                            ex);
-                    }
+				// Idempotency handling. Check if the Messages have already been written.
+				var (page, meta) = await ReadStreamInternal(
+						sqlStreamId,
+						streamVersion,
+						messages.Length,
+						ReadDirection.Forward,
+						false,
+						null!,
+						connection,
+						transaction,
+						cancellationToken)
+					.ConfigureAwait(false);
 
-                    for(int i = 0; i < Math.Min(messages.Length, page.Messages.Length); i++)
-                    {
-                        if(messages[i].MessageId != page.Messages[i].MessageId)
-                        {
-                            throw new WrongExpectedVersionException(
-                                ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.Any),
-                                sqlStreamId.IdOriginal,
-                                ExpectedVersion.Any,
-                                ex);
-                        }
-                    }
+				if (messages.Length > page.Messages.Length) {
+					throw new WrongExpectedVersionException(
+						ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.Any),
+						sqlStreamId.IdOriginal,
+						ExpectedVersion.Any,
+						ex);
+				}
 
-                    return new MsSqlAppendResult(
-                        meta.MaxCount,
-                        page.LastStreamVersion,
-                        page.LastStreamPosition,
-                        true);
-                }
-                catch(SqlException ex) when(ex.IsUniqueConstraintViolation())
-                {
-                    throw new WrongExpectedVersionException(
-                        ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.Any),
-                        sqlStreamId.IdOriginal,
-                        ExpectedVersion.Any,
-                        ex);
-                }
-            }
-        }
+				for (int i = 0; i < Math.Min(messages.Length, page.Messages.Length); i++) {
+					if (messages[i].MessageId != page.Messages[i].MessageId) {
+						throw new WrongExpectedVersionException(
+							ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.Any),
+							sqlStreamId.IdOriginal,
+							ExpectedVersion.Any,
+							ex);
+					}
+				}
 
-        private async Task<MsSqlAppendResult> AppendToStreamExpectedVersionNoStream(
-            SqlConnection connection,
-            SqlTransaction transaction,
-            SqlStreamId sqlStreamId,
-            NewStreamMessage[] messages,
-            CancellationToken cancellationToken)
-        {
-            using(var command = new SqlCommand(_scripts.AppendStreamExpectedVersionNoStream, connection, transaction))
-            {
-                command.CommandTimeout = _commandTimeout;
-                command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
-                command.Parameters.AddWithValue("streamIdOriginal", sqlStreamId.IdOriginal);
+				return new MsSqlAppendResult(
+					meta.MaxCount,
+					page.LastStreamVersion,
+					page.LastStreamPosition,
+					true);
+			} catch (SqlException ex) when (ex.IsUniqueConstraintViolation()) {
+				throw new WrongExpectedVersionException(
+					ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.Any),
+					sqlStreamId.IdOriginal,
+					ExpectedVersion.Any,
+					ex);
+			}
+		}
+	}
 
-                if(messages.Length != 0)
-                {
-                    var sqlDataRecords = CreateSqlDataRecords(messages);
-                    var eventsParam = CreateNewMessagesSqlParameter(sqlDataRecords);
-                    command.Parameters.Add(eventsParam);
-                    command.Parameters.AddWithValue("hasMessages", true);
-                }
-                else
-                {
-                    // Must use a null value for the table-valued param if there are no records
-                    var eventsParam = CreateNewMessagesSqlParameter(null);
-                    command.Parameters.Add(eventsParam);
-                    command.Parameters.AddWithValue("hasMessages", false);
-                }
+	private async Task<MsSqlAppendResult> AppendToStreamExpectedVersionNoStream(
+		SqlConnection connection,
+		SqlTransaction transaction,
+		SqlStreamId sqlStreamId,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		using (var command = new SqlCommand(_scripts.AppendStreamExpectedVersionNoStream, connection, transaction)) {
+			command.CommandTimeout = _commandTimeout;
+			command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
+			command.Parameters.AddWithValue("streamIdOriginal", sqlStreamId.IdOriginal);
 
-                try
-                {
-                    using(var reader = await command
-                        .ExecuteReaderAsync(cancellationToken)
-                        .ConfigureAwait(false))
-                    {
-                        await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+			if (messages.Length != 0) {
+				var sqlDataRecords = CreateSqlDataRecords(messages);
+				var eventsParam = CreateNewMessagesSqlParameter(sqlDataRecords);
+				command.Parameters.Add(eventsParam);
+				command.Parameters.AddWithValue("hasMessages", true);
+			} else {
+				// Must use a null value for the table-valued param if there are no records
+				var eventsParam = CreateNewMessagesSqlParameter(null);
+				command.Parameters.Add(eventsParam);
+				command.Parameters.AddWithValue("hasMessages", false);
+			}
 
-                        var currentVersion = reader.GetInt32(0);
-                        var currentPosition = reader.GetInt64(1);
-                        var maxCount = reader.GetNullableInt32(2);
+			try {
+				using (var reader = await command
+					       .ExecuteReaderAsync(cancellationToken)
+					       .ConfigureAwait(false)) {
+					await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-                        return new MsSqlAppendResult(maxCount, currentVersion, currentPosition, false);
-                    }
-                }
-                catch(SqlException ex)
-                {
-                    // Check for unique constraint violation on
-                    // https://technet.microsoft.com/en-us/library/aa258747%28v=sql.80%29.aspx
-                    if(ex.IsUniqueConstraintViolationOnIndex("IX_Streams_Id"))
-                    {
-                        // Idempotency handling. Check if the Messages have already been written.
-                        var (page, meta) = await ReadStreamInternal(
-                                sqlStreamId,
-                                StreamVersion.Start,
-                                messages.Length,
-                                ReadDirection.Forward,
-                                false,
-                                null,
-                                connection,
-                                transaction,
-                                cancellationToken)
-                            .ConfigureAwait(false);
+					var currentVersion = reader.GetInt32(0);
+					var currentPosition = reader.GetInt64(1);
+					var maxCount = reader.GetNullableInt32(2);
 
-                        if(messages.Length > page.Messages.Length)
-                        {
-                            throw new WrongExpectedVersionException(
-                                ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.NoStream),
-                                sqlStreamId.IdOriginal,
-                                ExpectedVersion.NoStream,
-                                ex);
-                        }
+					return new MsSqlAppendResult(maxCount, currentVersion, currentPosition, false);
+				}
+			} catch (SqlException ex) {
+				// Check for unique constraint violation on
+				// https://technet.microsoft.com/en-us/library/aa258747%28v=sql.80%29.aspx
+				if (ex.IsUniqueConstraintViolationOnIndex("IX_Streams_Id")) {
+					// Idempotency handling. Check if the Messages have already been written.
+					var (page, meta) = await ReadStreamInternal(
+							sqlStreamId,
+							StreamVersion.Start,
+							messages.Length,
+							ReadDirection.Forward,
+							false,
+							null!,
+							connection,
+							transaction,
+							cancellationToken)
+						.ConfigureAwait(false);
 
-                        for(int i = 0; i < Math.Min(messages.Length, page.Messages.Length); i++)
-                        {
-                            if(messages[i].MessageId != page.Messages[i].MessageId)
-                            {
-                                throw new WrongExpectedVersionException(
-                                    ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.NoStream),
-                                    sqlStreamId.IdOriginal,
-                                    ExpectedVersion.NoStream,
-                                    ex);
-                            }
-                        }
+					if (messages.Length > page.Messages.Length) {
+						throw new WrongExpectedVersionException(
+							ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.NoStream),
+							sqlStreamId.IdOriginal,
+							ExpectedVersion.NoStream,
+							ex);
+					}
 
-                        return new MsSqlAppendResult(
-                            meta.MaxCount,
-                            page.LastStreamVersion,
-                            page.LastStreamPosition,
-                            true);
-                    }
+					for (int i = 0; i < Math.Min(messages.Length, page.Messages.Length); i++) {
+						if (messages[i].MessageId != page.Messages[i].MessageId) {
+							throw new WrongExpectedVersionException(
+								ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.NoStream),
+								sqlStreamId.IdOriginal,
+								ExpectedVersion.NoStream,
+								ex);
+						}
+					}
 
-                    if(ex.IsUniqueConstraintViolation())
-                    {
-                        throw new WrongExpectedVersionException(
-                            ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.NoStream),
-                            sqlStreamId.IdOriginal,
-                            ExpectedVersion.NoStream,
-                            ex);
-                    }
+					return new MsSqlAppendResult(
+						meta.MaxCount,
+						page.LastStreamVersion,
+						page.LastStreamPosition,
+						true);
+				}
 
-                    throw;
-                }
-            }
-        }
+				if (ex.IsUniqueConstraintViolation()) {
+					throw new WrongExpectedVersionException(
+						ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, ExpectedVersion.NoStream),
+						sqlStreamId.IdOriginal,
+						ExpectedVersion.NoStream,
+						ex);
+				}
 
-        private async Task<MsSqlAppendResult> AppendToStreamExpectedVersion(
-            SqlConnection connection,
-            SqlTransaction transaction,
-            SqlStreamId sqlStreamId,
-            int expectedVersion,
-            NewStreamMessage[] messages,
-            CancellationToken cancellationToken)
-        {
-            var sqlDataRecords = CreateSqlDataRecords(messages);
+				throw;
+			}
+		}
+	}
 
-            using(var command = new SqlCommand(_scripts.AppendStreamExpectedVersion, connection, transaction))
-            {
-                command.CommandTimeout = _commandTimeout;
-                command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
-                command.Parameters.AddWithValue("expectedStreamVersion", expectedVersion);
-                var eventsParam = CreateNewMessagesSqlParameter(sqlDataRecords);
-                command.Parameters.Add(eventsParam);
+	private async Task<MsSqlAppendResult> AppendToStreamExpectedVersion(
+		SqlConnection connection,
+		SqlTransaction transaction,
+		SqlStreamId sqlStreamId,
+		int expectedVersion,
+		NewStreamMessage[] messages,
+		CancellationToken cancellationToken) {
+		var sqlDataRecords = CreateSqlDataRecords(messages);
 
-                try
-                {
-                    using (var reader = await command
-                        .ExecuteReaderAsync(cancellationToken)
-                        .ConfigureAwait(false))
-                    {
-                        await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+		using (var command = new SqlCommand(_scripts.AppendStreamExpectedVersion, connection, transaction)) {
+			command.CommandTimeout = _commandTimeout;
+			command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
+			command.Parameters.AddWithValue("expectedStreamVersion", expectedVersion);
+			var eventsParam = CreateNewMessagesSqlParameter(sqlDataRecords);
+			command.Parameters.Add(eventsParam);
 
-                        var currentVersion = reader.GetInt32(0);
-                        var currentPosition = reader.GetInt64(1);
-                        var maxCount = reader.GetNullableInt32(2);
+			try {
+				using (var reader = await command
+					       .ExecuteReaderAsync(cancellationToken)
+					       .ConfigureAwait(false)) {
+					await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-                        return new MsSqlAppendResult(maxCount, currentVersion, currentPosition, false);
-                    }
-                }
-                catch(SqlException ex)
-                {
-                    if(ex.Errors.Count == 1)
-                    {
-                        var sqlError = ex.Errors[0];
-                        if(sqlError.Message == "WrongExpectedVersion")
-                        {
-                            // Idempotency handling. Check if the Messages have already been written.
+					var currentVersion = reader.GetInt32(0);
+					var currentPosition = reader.GetInt64(1);
+					var maxCount = reader.GetNullableInt32(2);
 
-                            var(page, meta) = await ReadStreamInternal(
-                                sqlStreamId,
-                                expectedVersion + 1,
-                                // when reading for already written Messages, it's from the one after the expected
-                                messages.Length,
-                                ReadDirection.Forward,
-                                false,
-                                null,
-                                connection,
-                                transaction,
-                                cancellationToken);
+					return new MsSqlAppendResult(maxCount, currentVersion, currentPosition, false);
+				}
+			} catch (SqlException ex) {
+				if (ex.Errors.Count == 1) {
+					var sqlError = ex.Errors[0];
+					if (sqlError.Message == "WrongExpectedVersion") {
+						// Idempotency handling. Check if the Messages have already been written.
 
-                            if(messages.Length > page.Messages.Length)
-                            {
-                                throw new WrongExpectedVersionException(
-                                    ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, expectedVersion),
-                                    sqlStreamId.IdOriginal,
-                                    expectedVersion,
-                                    ex);
-                            }
+						var (page, meta) = await ReadStreamInternal(
+							sqlStreamId,
+							expectedVersion + 1,
+							// when reading for already written Messages, it's from the one after the expected
+							messages.Length,
+							ReadDirection.Forward,
+							false,
+							null!,
+							connection,
+							transaction,
+							cancellationToken);
 
-                            // Iterate all messages an check to see if all message ids match
-                            for(int i = 0; i < Math.Min(messages.Length, page.Messages.Length); i++)
-                            {
-                                if(messages[i].MessageId != page.Messages[i].MessageId)
-                                {
-                                    throw new WrongExpectedVersionException(
-                                        ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, expectedVersion),
-                                        sqlStreamId.IdOriginal,
-                                        expectedVersion,
-                                        ex);
-                                }
-                            }
+						if (messages.Length > page.Messages.Length) {
+							throw new WrongExpectedVersionException(
+								ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, expectedVersion),
+								sqlStreamId.IdOriginal,
+								expectedVersion,
+								ex);
+						}
 
-                            return new MsSqlAppendResult(
-                                meta.MaxCount,
-                                page.LastStreamVersion,
-                                page.LastStreamPosition,
-                                true);
-                        }
-                    }
-                    if(ex.IsUniqueConstraintViolation())
-                    {
-                        throw new WrongExpectedVersionException(
-                            ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, expectedVersion),
-                            sqlStreamId.IdOriginal,
-                            expectedVersion,
-                            ex);
-                    }
-                    throw;
-                }
-            }
-        }
+						// Iterate all messages an check to see if all message ids match
+						for (int i = 0; i < Math.Min(messages.Length, page.Messages.Length); i++) {
+							if (messages[i].MessageId != page.Messages[i].MessageId) {
+								throw new WrongExpectedVersionException(
+									ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, expectedVersion),
+									sqlStreamId.IdOriginal,
+									expectedVersion,
+									ex);
+							}
+						}
 
-        private async Task CheckStreamMaxCount(string streamId, int? maxCount, CancellationToken cancellationToken)
-        {
-            if (maxCount.HasValue)
-            {
-                var count = await GetStreamMessageCount(streamId, cancellationToken);
-                if (count > maxCount.Value)
-                {
-                    int toPurge = count - maxCount.Value;
+						return new MsSqlAppendResult(
+							meta.MaxCount,
+							page.LastStreamVersion,
+							page.LastStreamPosition,
+							true);
+					}
+				}
+				if (ex.IsUniqueConstraintViolation()) {
+					throw new WrongExpectedVersionException(
+						ErrorMessages.AppendFailedWrongExpectedVersion(sqlStreamId.IdOriginal, expectedVersion),
+						sqlStreamId.IdOriginal,
+						expectedVersion,
+						ex);
+				}
+				throw;
+			}
+		}
+	}
 
-                    var streamMessagesPage = await ReadStreamForwardsInternal(streamId, StreamVersion.Start,
-                        toPurge, false, null, cancellationToken);
+	private async Task CheckStreamMaxCount(string streamId, int? maxCount, CancellationToken cancellationToken) {
+		if (maxCount.HasValue) {
+			var count = await GetStreamMessageCount(streamId, cancellationToken);
+			if (count > maxCount.Value) {
+				int toPurge = count - maxCount.Value;
 
-                    if (streamMessagesPage.Status == PageReadStatus.Success)
-                    {
-                        foreach (var message in streamMessagesPage.Messages)
-                        {
-                            await DeleteEventInternal(streamId, message.MessageId, cancellationToken);
-                        }
-                    }
-                }
-            }
-        }
+				var streamMessagesPage = await ReadStreamForwardsInternal(streamId, StreamVersion.Start,
+					toPurge, false, null!, cancellationToken);
 
-        private async Task<int> GetStreamVersionOfMessageId(
-            SqlConnection connection,
-            SqlTransaction transaction,
-            SqlStreamId sqlStreamId,
-            Guid messageId,
-            CancellationToken cancellationToken)
-        {
-            using(var command = new SqlCommand(_scripts.GetStreamVersionOfMessageId, connection, transaction))
-            {
-                command.CommandTimeout = _commandTimeout;
-                command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
-                command.Parameters.AddWithValue("messageId", messageId);
+				if (streamMessagesPage.Status == PageReadStatus.Success) {
+					foreach (var message in streamMessagesPage.Messages) {
+						await DeleteEventInternal(streamId, message.MessageId, cancellationToken);
+					}
+				}
+			}
+		}
+	}
 
-                var result = await command.ExecuteScalarAsync(cancellationToken)
-                    .ConfigureAwait(false);
+	private async Task<int> GetStreamVersionOfMessageId(
+		SqlConnection connection,
+		SqlTransaction transaction,
+		SqlStreamId sqlStreamId,
+		Guid messageId,
+		CancellationToken cancellationToken) {
+		using (var command = new SqlCommand(_scripts.GetStreamVersionOfMessageId, connection, transaction)) {
+			command.CommandTimeout = _commandTimeout;
+			command.Parameters.Add(new SqlParameter("streamId", SqlDbType.Char, 42) { Value = sqlStreamId.Id });
+			command.Parameters.AddWithValue("messageId", messageId);
 
-                return (int) result;
-            }
-        }
+			var result = await command.ExecuteScalarAsync(cancellationToken)
+				.ConfigureAwait(false);
 
-        private SqlDataRecord[] CreateSqlDataRecords(NewStreamMessage[] messages)
-        {
-            var dateTime = GetUtcNow();
-            var sqlDataRecords = messages.Select(message =>
-            {
-                var record = new SqlDataRecord(_appendToStreamSqlMetadata);
-                record.SetGuid(1, message.MessageId);
-                record.SetDateTime(2, dateTime);
-                record.SetString(3, message.Type);
-                record.SetString(4, message.JsonData);
-                record.SetString(5, message.JsonMetadata);
-                return record;
-            }).ToArray();
-            return sqlDataRecords;
-        }
+			return (int)result;
+		}
+	}
 
-        private SqlParameter CreateNewMessagesSqlParameter(SqlDataRecord[] sqlDataRecords)
-        {
-            var eventsParam = new SqlParameter("newMessages", SqlDbType.Structured)
-            {
-                TypeName = $"{_scripts.Schema}.NewStreamMessages",
-                Value = sqlDataRecords
-            };
-            return eventsParam;
-        }
+	private SqlDataRecord[] CreateSqlDataRecords(NewStreamMessage[] messages) {
+		var dateTime = GetUtcNow();
+		var sqlDataRecords = messages.Select(message => {
+			var record = new SqlDataRecord(_appendToStreamSqlMetadata);
+			record.SetGuid(1, message.MessageId);
+			record.SetDateTime(2, dateTime);
+			record.SetString(3, message.Type);
+			record.SetString(4, message.JsonData);
+			record.SetString(5, message.JsonMetadata);
+			return record;
+		}).ToArray();
+		return sqlDataRecords;
+	}
 
-        internal class StreamMeta
-        {
-            public static readonly StreamMeta None = new StreamMeta(null, null);
+	private SqlParameter CreateNewMessagesSqlParameter(SqlDataRecord[]? sqlDataRecords) {
+		var eventsParam = new SqlParameter("newMessages", SqlDbType.Structured) {
+			TypeName = $"{_scripts.Schema}.NewStreamMessages",
+			Value = sqlDataRecords
+		};
+		return eventsParam;
+	}
 
-            public StreamMeta(int? maxCount, int? maxAge)
-            {
-                MaxCount = maxCount;
-                MaxAge = maxAge;
-            }
+	internal class StreamMeta {
+		public static readonly StreamMeta None = new(null, null);
 
-            public int? MaxCount { get; }
+		public StreamMeta(int? maxCount, int? maxAge) {
+			MaxCount = maxCount;
+			MaxAge = maxAge;
+		}
 
-            public int? MaxAge { get; }
-        }
-    }
+		public int? MaxCount { get; }
+
+		public int? MaxAge { get; }
+	}
 }

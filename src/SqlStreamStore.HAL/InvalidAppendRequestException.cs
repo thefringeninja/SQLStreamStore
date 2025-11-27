@@ -1,15 +1,11 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System;
+﻿namespace SqlStreamStore.HAL;
 
-    internal class InvalidAppendRequestException : Exception
-    {
-        public InvalidAppendRequestException(string message)
-            : base(message)
-        { }
+using System;
 
-        public InvalidAppendRequestException(string message, Exception inner)
-            : base(message, inner)
-        { }
-    }
+internal class InvalidAppendRequestException : Exception {
+	public InvalidAppendRequestException(string message)
+		: base(message) { }
+
+	public InvalidAppendRequestException(string message, Exception inner)
+		: base(message, inner) { }
 }

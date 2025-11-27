@@ -1,7 +1,5 @@
-namespace SqlStreamStore.InMemory
-{
-    using System.Collections.Generic;
+namespace SqlStreamStore.InMemory;
 
-    internal class InMemoryAllStream : LinkedList<InMemoryStreamMessage>
-    {}
-}
+using System.Collections.Generic;
+
+internal class InMemoryAllStream : LinkedList<InMemoryStreamMessage> { }

@@ -1,28 +1,24 @@
-namespace SqlStreamStore.HAL.AllStreamMessage
-{
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.AspNetCore.Routing;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore.HAL.AllStreamMessage;
 
-    internal class ReadAllStreamMessageOperation : IStreamStoreOperation<StreamMessage>
-    {
-        public ReadAllStreamMessageOperation(HttpContext context)
-        {
-            Path = context.Request.Path;
-            Position = context.GetRouteData().GetPosition();
-        }
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using SqlStreamStore.Streams;
 
-        public long Position { get; }
-        public PathString Path { get; }
+internal class ReadAllStreamMessageOperation : IStreamStoreOperation<StreamMessage> {
+	public ReadAllStreamMessageOperation(HttpContext context) {
+		Path = context.Request.Path;
+		Position = context.GetRouteData().GetPosition();
+	}
 
-        public async Task<StreamMessage> Invoke(IStreamStore streamStore, CancellationToken ct)
-        {
-            var page = await streamStore.ReadAllForwards(Position, 1, true, ct);
+	public long Position { get; }
+	public PathString Path { get; }
 
-            return page.Messages.Where(m => m.Position == Position).FirstOrDefault();
-        }
-    }
+	public async Task<StreamMessage> Invoke(IStreamStore streamStore, CancellationToken ct) {
+		var page = await streamStore.ReadAllForwards(Position, 1, true, ct);
+
+		return page.Messages.Where(m => m.Position == Position).FirstOrDefault();
+	}
 }

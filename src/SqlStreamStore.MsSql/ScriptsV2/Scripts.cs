@@ -1,90 +1,79 @@
-﻿namespace SqlStreamStore.ScriptsV2
-{
-    using System;
-    using System.Collections.Concurrent;
-    using System.IO;
-    using System.Reflection;
+﻿namespace SqlStreamStore.ScriptsV2;
 
-    internal class Scripts
-    {
-        internal readonly string Schema;
-        private readonly ConcurrentDictionary<string, string> _scripts 
-            = new ConcurrentDictionary<string, string>();
+using System;
+using System.Collections.Concurrent;
+using System.IO;
+using System.Reflection;
 
-        internal Scripts(string schema)
-        {
-            Schema = schema;
-        }
+internal class Scripts {
+	internal readonly string Schema;
+	private readonly ConcurrentDictionary<string, string> _scripts = new();
 
-        internal string AppendStreamExpectedVersionAny => GetScript(nameof(AppendStreamExpectedVersionAny));
+	internal Scripts(string schema) {
+		Schema = schema;
+	}
 
-        internal string AppendStreamExpectedVersion => GetScript(nameof(AppendStreamExpectedVersion));
+	internal string AppendStreamExpectedVersionAny => GetScript(nameof(AppendStreamExpectedVersionAny));
 
-        internal string AppendStreamExpectedVersionNoStream => GetScript(nameof(AppendStreamExpectedVersionNoStream));
+	internal string AppendStreamExpectedVersion => GetScript(nameof(AppendStreamExpectedVersion));
 
-        internal string DeleteStreamAnyVersion => GetScript(nameof(DeleteStreamAnyVersion));
+	internal string AppendStreamExpectedVersionNoStream => GetScript(nameof(AppendStreamExpectedVersionNoStream));
 
-        internal string DeleteStreamMessage => GetScript(nameof(DeleteStreamMessage));
+	internal string DeleteStreamAnyVersion => GetScript(nameof(DeleteStreamAnyVersion));
 
-        internal string DeleteStreamExpectedVersion => GetScript(nameof(DeleteStreamExpectedVersion));
+	internal string DeleteStreamMessage => GetScript(nameof(DeleteStreamMessage));
 
-        internal string DropAll => GetScript(nameof(DropAll));
+	internal string DeleteStreamExpectedVersion => GetScript(nameof(DeleteStreamExpectedVersion));
 
-        internal string GetStreamMessageCount => GetScript(nameof(GetStreamMessageCount));
+	internal string DropAll => GetScript(nameof(DropAll));
 
-        internal string GetStreamMessageBeforeCreatedCount => GetScript(nameof(GetStreamMessageBeforeCreatedCount));
+	internal string GetStreamMessageCount => GetScript(nameof(GetStreamMessageCount));
 
-        internal string CreateSchema => GetScript(nameof(CreateSchema));
+	internal string GetStreamMessageBeforeCreatedCount => GetScript(nameof(GetStreamMessageBeforeCreatedCount));
 
-        internal string CreateSchema_v1 => GetScript(nameof(CreateSchema_v1));
+	internal string CreateSchema => GetScript(nameof(CreateSchema));
 
-        internal string GetSchemaVersion => GetScript(nameof(GetSchemaVersion));
+	internal string CreateSchema_v1 => GetScript(nameof(CreateSchema_v1));
 
-        internal string GetStreamVersionOfMessageId => GetScript(nameof(GetStreamVersionOfMessageId));
+	internal string GetSchemaVersion => GetScript(nameof(GetSchemaVersion));
 
-        internal string ReadHeadPosition => GetScript(nameof(ReadHeadPosition));
+	internal string GetStreamVersionOfMessageId => GetScript(nameof(GetStreamVersionOfMessageId));
 
-        internal string ReadStreamHeadPosition => GetScript(nameof(ReadStreamHeadPosition));
+	internal string ReadHeadPosition => GetScript(nameof(ReadHeadPosition));
 
-        internal string ReadStreamHeadVersion => GetScript(nameof(ReadStreamHeadVersion));
+	internal string ReadStreamHeadPosition => GetScript(nameof(ReadStreamHeadPosition));
 
-        internal string ReadAllForward => GetScript(nameof(ReadAllForward));
+	internal string ReadStreamHeadVersion => GetScript(nameof(ReadStreamHeadVersion));
 
-        internal string ReadAllForwardWithData => GetScript(nameof(ReadAllForwardWithData));
+	internal string ReadAllForward => GetScript(nameof(ReadAllForward));
 
-        internal string ReadAllBackward => GetScript(nameof(ReadAllBackward));
+	internal string ReadAllForwardWithData => GetScript(nameof(ReadAllForwardWithData));
 
-        internal string ReadAllBackwardWithData => GetScript(nameof(ReadAllBackwardWithData));
+	internal string ReadAllBackward => GetScript(nameof(ReadAllBackward));
 
-        internal string ReadStreamForward => GetScript(nameof(ReadStreamForward));
+	internal string ReadAllBackwardWithData => GetScript(nameof(ReadAllBackwardWithData));
 
-        internal string ReadStreamForwardWithData => GetScript(nameof(ReadStreamForwardWithData));
+	internal string ReadStreamForward => GetScript(nameof(ReadStreamForward));
 
-        internal string ReadStreamBackward => GetScript(nameof(ReadStreamBackward));
+	internal string ReadStreamForwardWithData => GetScript(nameof(ReadStreamForwardWithData));
 
-        internal string ReadStreamBackwardWithData => GetScript(nameof(ReadStreamBackwardWithData));
+	internal string ReadStreamBackward => GetScript(nameof(ReadStreamBackward));
 
-        internal string ReadMessageData => GetScript(nameof(ReadMessageData));
+	internal string ReadStreamBackwardWithData => GetScript(nameof(ReadStreamBackwardWithData));
 
-        private string GetScript(string name)
-        {
-            return _scripts.GetOrAdd(name,
-                key =>
-                {
-                    using (Stream stream = typeof(Scripts).GetTypeInfo().Assembly.GetManifestResourceStream("SqlStreamStore.ScriptsV2." + key + ".sql"))
-                    {
-                        if (stream == null)
-                        {
-                            throw new Exception($"Embedded resource, {name}, not found. BUG!");
-                        }
-                        using (StreamReader reader = new StreamReader(stream))
-                        {
-                            return reader
-                                .ReadToEnd()
-                                .Replace("dbo", Schema);
-                        }
-                    }
-                });
-        }
-    }
+	internal string ReadMessageData => GetScript(nameof(ReadMessageData));
+
+	private string GetScript(string name) {
+		return _scripts.GetOrAdd(name,
+			key => {
+				using (Stream stream = typeof(Scripts).GetTypeInfo().Assembly.GetManifestResourceStream("SqlStreamStore.ScriptsV2." + key + ".sql")
+				                       ?? throw new Exception($"Embedded resource, {name}, not found. BUG!")) {
+					using (StreamReader reader = new StreamReader(stream)) {
+						return reader
+							.ReadToEnd()
+							.Replace("dbo", Schema);
+					}
+				}
+			});
+	}
 }

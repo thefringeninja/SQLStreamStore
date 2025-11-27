@@ -1,23 +1,21 @@
-﻿namespace SqlStreamStore.Streams
-{
-    /// <summary>
-    ///     Constants for store position
-    /// </summary>
-    public static class Position
-    {
-        /// <summary>
-        ///     No position
-        /// </summary>
-        public static readonly long? None = null;
+﻿namespace SqlStreamStore.Streams;
 
-        /// <summary>
-        ///     The start of the store.
-        /// </summary>
-        public const long Start = 0;
+/// <summary>
+///     Constants for store position
+/// </summary>
+public static class Position {
+	/// <summary>
+	///     No position
+	/// </summary>
+	public static readonly long? None = null;
 
-        /// <summary>
-        ///     The end of the store.
-        /// </summary>
-        public const long End = -1;
-    }
+	/// <summary>
+	///     The start of the store.
+	/// </summary>
+	public const long Start = 0;
+
+	/// <summary>
+	///     The end of the store.
+	/// </summary>
+	public const long End = -1;
 }

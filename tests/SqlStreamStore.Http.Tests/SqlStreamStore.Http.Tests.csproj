@@ -1,24 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>SqlStreamStore.Http.Tests</AssemblyName>
+        <PackageId>SqlStreamStore.Http.Tests</PackageId>
+        <RootNamespace>SqlStreamStore</RootNamespace>
+    </PropertyGroup>
 
-  <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <AssemblyName>SqlStreamStore.Http.Tests</AssemblyName>
-    <PackageId>SqlStreamStore.Http.Tests</PackageId>
-    <RootNamespace>SqlStreamStore</RootNamespace>
-  </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0"/>
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Compile Include="..\SqlStreamStore.AcceptanceTests\*.cs" Exclude="..\SqlStreamStore.AcceptanceTests\AcceptanceTests.StreamLimits.cs;..\SqlStreamStore.AcceptanceTests\AcceptanceTests.DeletionTracking.cs"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="..\SqlStreamStore.AcceptanceTests\*.cs" Exclude="..\SqlStreamStore.AcceptanceTests\AcceptanceTests.StreamLimits.cs;..\SqlStreamStore.AcceptanceTests\AcceptanceTests.DeletionTracking.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\SqlStreamStore.HAL\SqlStreamStore.HAL.csproj" />
-    <ProjectReference Include="..\..\src\SqlStreamStore.Http\SqlStreamStore.Http.csproj" />
-    <ProjectReference Include="..\..\src\SqlStreamStore.TestUtils\SqlStreamStore.TestUtils.csproj" />
-    <ProjectReference Include="..\..\src\SqlStreamStore\SqlStreamStore.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="3.1.5" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\SqlStreamStore.HAL\SqlStreamStore.HAL.csproj"/>
+        <ProjectReference Include="..\..\src\SqlStreamStore.Http\SqlStreamStore.Http.csproj"/>
+        <ProjectReference Include="..\SqlStreamStore.TestUtils\SqlStreamStore.TestUtils.csproj"/>
+        <ProjectReference Include="..\..\src\SqlStreamStore\SqlStreamStore.csproj"/>
+    </ItemGroup>
 </Project>

@@ -1,266 +1,226 @@
-﻿namespace SqlStreamStore
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Data;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using MySqlConnector;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.Logging;
-    using SqlStreamStore.MySqlScripts;
-    using SqlStreamStore.Subscriptions;
-    using StreamStoreStore.Json;
+﻿namespace SqlStreamStore;
 
-    /// <inheritdoc />
-    /// <summary>
-    ///     Represents a MySql stream store implementation.
-    /// </summary>
-    public partial class MySqlStreamStore : StreamStoreBase
-    {
-        private readonly MySqlStreamStoreSettings _settings;
-        private readonly Func<MySqlConnection> _createConnection;
-        private readonly Schema _schema;
-        private readonly Lazy<IStreamStoreNotifier> _streamStoreNotifier;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using MySqlConnector;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.MySqlScripts;
+using SqlStreamStore.Subscriptions;
 
-        public const int CurrentVersion = 1;
+/// <inheritdoc />
+/// <summary>
+///     Represents a MySql stream store implementation.
+/// </summary>
+public partial class MySqlStreamStore : StreamStoreBase {
+	private readonly MySqlStreamStoreSettings _settings;
+	private readonly Func<MySqlConnection> _createConnection;
+	private readonly Schema _schema;
+	private readonly Lazy<IStreamStoreNotifier> _streamStoreNotifier;
 
-        /// <inheritdoc />
-        /// <summary>
-        ///     Initializes a new instance of <see cref="T:SqlStreamStore.MySqlStreamStore" />
-        /// </summary>
-        /// <param name="settings">A settings class to configure this instance.</param>
-        public MySqlStreamStore(MySqlStreamStoreSettings settings)
-            : base(settings.GetUtcNow, settings.LogName)
-        {
-            _settings = settings;
-            _createConnection = () => _settings.ConnectionFactory(_settings.ConnectionString);
-            _streamStoreNotifier = new Lazy<IStreamStoreNotifier>(() =>
-            {
-                if(_settings.CreateStreamStoreNotifier == null)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot create notifier because supplied createStreamStoreNotifier was null");
-                }
+	public const int CurrentVersion = 1;
 
-                return settings.CreateStreamStoreNotifier.Invoke(this);
-            });
-            _schema = new Schema();
-        }
+	/// <inheritdoc />
+	/// <summary>
+	///     Initializes a new instance of <see cref="T:SqlStreamStore.MySqlStreamStore" />
+	/// </summary>
+	/// <param name="settings">A settings class to configure this instance.</param>
+	public MySqlStreamStore(MySqlStreamStoreSettings settings)
+		: base(settings.GetUtcNow, settings.LoggerFactory?.CreateLogger(settings.LogName)) {
+		_settings = settings;
+		_createConnection = () => _settings.ConnectionFactory(_settings.ConnectionString);
+		_streamStoreNotifier = new Lazy<IStreamStoreNotifier>(() => {
+			if (_settings.CreateStreamStoreNotifier == null) {
+				throw new InvalidOperationException(
+					"Cannot create notifier because supplied createStreamStoreNotifier was null");
+			}
 
-        /// <summary>
-        ///     Creates a scheme that will hold streams and messages, if the schema does not exist.
-        ///     Calls to this should part of an application's deployment/upgrade process and
-        ///     not every time your application boots up.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation instruction.</param>
-        /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        public async Task CreateSchemaIfNotExists(CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+			return settings.CreateStreamStoreNotifier.Invoke(this);
+		});
+		_schema = new Schema();
+	}
 
-            using(var connection = await OpenConnection(cancellationToken))
-            using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-            {
-                using(var command = BuildCommand(_schema.Definition, transaction))
-                {
-                    await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                }
+	/// <summary>
+	///     Creates a scheme that will hold streams and messages, if the schema does not exist.
+	///     Calls to this should part of an application's deployment/upgrade process and
+	///     not every time your application boots up.
+	/// </summary>
+	/// <param name="cancellationToken">The cancellation instruction.</param>
+	/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+	public async Task CreateSchemaIfNotExists(CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
+		using (var connection = await OpenConnection(cancellationToken))
+		using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)) {
+			using (var command = BuildCommand(_schema.Definition, transaction)) {
+				await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+			}
 
-        /// <summary>
-        ///     Drops all tables related to this store instance.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation instruction.</param>
-        /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        public async Task DropAll(CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+			await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+		}
+	}
 
-            using(var connection = _createConnection())
-            {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                using(var command = BuildCommand(_schema.DropAll, transaction))
-                {
-                    await command
-                        .ExecuteNonQueryAsync(cancellationToken)
-                        .ConfigureAwait(false);
+	/// <summary>
+	///     Drops all tables related to this store instance.
+	/// </summary>
+	/// <param name="cancellationToken">The cancellation instruction.</param>
+	/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+	public async Task DropAll(CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
+		using (var connection = _createConnection()) {
+			await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+			using (var command = BuildCommand(_schema.DropAll, transaction)) {
+				await command
+					.ExecuteNonQueryAsync(cancellationToken)
+					.ConfigureAwait(false);
 
-        /// <summary>
-        ///     Checks the store schema for the correct version.
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns>A <see cref="CheckSchemaResult"/> representing the result of the operation.</returns>
-        public async Task<CheckSchemaResult> CheckSchema(CancellationToken cancellationToken = default)
-        {
-            GuardAgainstDisposed();
+				await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+			}
+		}
+	}
 
-            using(var connection = _createConnection())
-            {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                using(var command = BuildStoredProcedureCall(_schema.ReadProperties, transaction))
-                {
-                    var properties = SimpleJson.DeserializeObject<SchemaProperties>(
-                        (string) await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+	/// <summary>
+	///     Checks the store schema for the correct version.
+	/// </summary>
+	/// <param name="cancellationToken"></param>
+	/// <returns>A <see cref="CheckSchemaResult"/> representing the result of the operation.</returns>
+	public async Task<CheckSchemaResult> CheckSchema(CancellationToken cancellationToken = default) {
+		GuardAgainstDisposed();
 
-                    return new CheckSchemaResult(properties.version, CurrentVersion);
-                }
-            }
-        }
+		using (var connection = _createConnection()) {
+			await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+			using (var command = BuildStoredProcedureCall(_schema.ReadProperties, transaction)) {
+				var properties = SimpleJson.DeserializeObject<SchemaProperties>(
+					(string?)await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
 
-        protected override void Dispose(bool disposing)
-        {
-            if(disposing)
-            {
-                if(_streamStoreNotifier.IsValueCreated)
-                {
-                    _streamStoreNotifier.Value.Dispose();
-                }
-            }
+				return new CheckSchemaResult(properties!.version, CurrentVersion);
+			}
+		}
+	}
 
-            base.Dispose(disposing);
-        }
+	protected override void Dispose(bool disposing) {
+		if (disposing) {
+			if (_streamStoreNotifier.IsValueCreated) {
+				_streamStoreNotifier.Value.Dispose();
+			}
+		}
 
-        internal async Task<int> TryScavenge(
-            StreamIdInfo streamId,
-            CancellationToken cancellationToken)
-        {
-            if(streamId.MySqlStreamId == MySqlStreamId.Deleted)
-            {
-                return -1;
-            }
+		base.Dispose(disposing);
+	}
 
-            try
-            {
-                using(var connection = await OpenConnection(cancellationToken))
-                using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    var deletedMessageIds = new List<Guid>();
-                    using(var command = BuildStoredProcedureCall(
-                        _schema.Scavenge,
-                        transaction,
-                        Parameters.StreamId(streamId.MySqlStreamId)))
-                    using(var reader = await command
-                        .ExecuteReaderAsync(cancellationToken)
-                        .ConfigureAwait(false))
-                    {
-                        while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                        {
-                            deletedMessageIds.Add(reader.GetGuid(0));
-                        }
-                    }
+	internal async Task<int> TryScavenge(
+		StreamIdInfo streamId,
+		CancellationToken cancellationToken) {
+		if (streamId.MySqlStreamId == MySqlStreamId.Deleted) {
+			return -1;
+		}
 
-                    Logger.Info(
-                        "Found {deletedMessageIdCount} message(s) for stream {streamId} to scavenge.",
-                        deletedMessageIds.Count,
-                        streamId.MySqlStreamId.IdOriginal);
+		try {
+			using (var connection = await OpenConnection(cancellationToken))
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)) {
+				var deletedMessageIds = new List<Guid>();
+				using (var command = BuildStoredProcedureCall(
+					       _schema.Scavenge,
+					       transaction,
+					       Parameters.StreamId(streamId.MySqlStreamId)))
+				using (var reader = await command
+					       .ExecuteReaderAsync(cancellationToken)
+					       .ConfigureAwait(false)) {
+					while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) {
+						deletedMessageIds.Add(reader.GetGuid(0));
+					}
+				}
 
-                    if(deletedMessageIds.Count > 0)
-                    {
-                        Logger.Debug(
-                            "Scavenging the following messages on stream {streamId}: {deletedMessageIds}",
-                            streamId.MySqlStreamId.IdOriginal,
-                            deletedMessageIds);
-                    }
+				Logger.LogInformation(
+					"Found {deletedMessageIdCount} message(s) for stream {streamId} to scavenge.",
+					deletedMessageIds.Count,
+					streamId.MySqlStreamId.IdOriginal);
 
-                    foreach(var deletedMessageId in deletedMessageIds)
-                    {
-                        await DeleteEventInternal(streamId, deletedMessageId, transaction, cancellationToken);
-                    }
+				if (deletedMessageIds.Count > 0) {
+					Logger.LogDebug(
+						"Scavenging the following messages on stream {streamId}: {deletedMessageIds}",
+						streamId.MySqlStreamId.IdOriginal,
+						deletedMessageIds);
+				}
 
-                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+				foreach (var deletedMessageId in deletedMessageIds) {
+					await DeleteEventInternal(streamId, deletedMessageId, transaction, cancellationToken);
+				}
 
-                    return deletedMessageIds.Count;
-                }
-            }
-            catch(Exception ex)
-            {
-                Logger.WarnException(
-                    "Scavenge attempt failed on stream {streamId}. Another attempt will be made when this stream is written to.",
-                    ex,
-                    streamId.MySqlStreamId.IdOriginal);
-            }
+				await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-            return -1;
-        }
+				return deletedMessageIds.Count;
+			}
+		} catch (Exception ex) {
+			Logger.LogWarning(ex,
+				"Scavenge attempt failed on stream {streamId}. Another attempt will be made when this stream is written to.",
+				streamId.MySqlStreamId.IdOriginal);
+		}
 
-        private static MySqlCommand BuildStoredProcedureCall(
-            string procedure,
-            MySqlTransaction transaction,
-            params MySqlParameter[] parameters)
-        {
-            var command = new MySqlCommand(procedure, transaction.Connection, transaction)
-            {
-                CommandType = CommandType.StoredProcedure
-            };
+		return -1;
+	}
 
-            foreach(var parameter in parameters)
-            {
-                command.Parameters.Add(parameter);
-            }
+	private static MySqlCommand BuildStoredProcedureCall(
+		string procedure,
+		MySqlTransaction transaction,
+		params MySqlParameter[] parameters) {
+		var command = new MySqlCommand(procedure, transaction.Connection, transaction) {
+			CommandType = CommandType.StoredProcedure
+		};
 
-            return command;
-        }
+		foreach (var parameter in parameters) {
+			command.Parameters.Add(parameter);
+		}
 
-        private static MySqlCommand BuildCommand(
-            string commandText,
-            MySqlTransaction transaction) => new MySqlCommand(commandText, transaction.Connection, transaction);
+		return command;
+	}
 
-        /// <summary>
-        /// Returns the script that can be used to create the Sql Stream Store in a MySql database.
-        /// </summary>
-        /// <returns>The database creation script.</returns>
-        public string GetSchemaCreationScript()
-        {
-            return _schema.Definition;
-        }
+	private static MySqlCommand BuildCommand(string commandText, MySqlTransaction transaction) =>
+		new(commandText, transaction.Connection, transaction);
 
-        private async Task<MySqlConnection> OpenConnection(CancellationToken cancellationToken)
-        {
-            var connection = _createConnection();
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-            return connection;
-        }
+	/// <summary>
+	/// Returns the script that can be used to create the Sql Stream Store in a MySql database.
+	/// </summary>
+	/// <returns>The database creation script.</returns>
+	public string GetSchemaCreationScript() {
+		return _schema.Definition;
+	}
 
-        private Func<CancellationToken, Task<string>> GetJsonData(MySqlStreamId streamId, int version)
-            => async cancellationToken =>
-            {
-                using(var connection = await OpenConnection(cancellationToken))
-                using(var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
-                using(var command = BuildStoredProcedureCall(
-                    _schema.ReadJsonData,
-                    transaction,
-                    Parameters.StreamId(streamId),
-                    Parameters.Version(version)))
-                using(var reader = await command
-                    .ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken)
-                    .ConfigureAwait(false))
-                {
-                    if(!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || reader.IsDBNull(0))
-                    {
-                        return null;
-                    }
+	private async Task<MySqlConnection> OpenConnection(CancellationToken cancellationToken) {
+		var connection = _createConnection();
+		await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+		return connection;
+	}
 
-                    using(var textReader = reader.GetTextReader(0))
-                    {
-                        return await textReader.ReadToEndAsync().ConfigureAwait(false);
-                    }
-                }
-            };
+	private Func<CancellationToken, Task<string?>> GetJsonData(MySqlStreamId streamId, int version)
+		=> async cancellationToken => {
+			using (var connection = await OpenConnection(cancellationToken))
+			using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+			using (var command = BuildStoredProcedureCall(
+				       _schema.ReadJsonData,
+				       transaction,
+				       Parameters.StreamId(streamId),
+				       Parameters.Version(version)))
+			using (var reader = await command
+				       .ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken)
+				       .ConfigureAwait(false)) {
+				if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || reader.IsDBNull(0)) {
+					return null;
+				}
 
-        private class SchemaProperties
-        {
-            public int version { get; set; }
-        }
-    }
+				using (var textReader = reader.GetTextReader(0)) {
+					return await textReader.ReadToEndAsync().ConfigureAwait(false);
+				}
+			}
+		};
+
+	private class SchemaProperties {
+		public int version { get; set; }
+	}
 }

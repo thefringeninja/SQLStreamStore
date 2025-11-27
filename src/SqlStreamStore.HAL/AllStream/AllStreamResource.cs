@@ -1,99 +1,87 @@
-﻿namespace SqlStreamStore.HAL.AllStream
-{
-    using System;
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Halcyon.HAL;
-    using SqlStreamStore.Streams;
+﻿namespace SqlStreamStore.HAL.AllStream;
 
-    internal class AllStreamResource : IResource
-    {
-        private readonly IStreamStore _streamStore;
-        private readonly bool _useCanonicalUrls;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using SqlStreamStore.Streams;
 
-        public SchemaSet Schema { get; }
+internal class AllStreamResource : IResource {
+	private readonly IStreamStore _streamStore;
+	private readonly bool _useCanonicalUrls;
 
-        public AllStreamResource(IStreamStore streamStore, bool useCanonicalUrls)
-        {
-            if(streamStore == null)
-                throw new ArgumentNullException(nameof(streamStore));
-            _streamStore = streamStore;
-            _useCanonicalUrls = useCanonicalUrls;
-        }
+	public SchemaSet? Schema { get; }
 
-        public async Task<Response> Get(
-            ReadAllStreamOperation operation,
-            CancellationToken cancellationToken)
-        {
-            if(_useCanonicalUrls && !operation.IsUriCanonical)
-            {
-                return new PermanentRedirectResponse(operation.Self);
-            }
+	public AllStreamResource(IStreamStore streamStore, bool useCanonicalUrls) {
+		ArgumentNullException.ThrowIfNull(streamStore);
+		_streamStore = streamStore;
+		_useCanonicalUrls = useCanonicalUrls;
+	}
 
-            var page = await operation.Invoke(_streamStore, cancellationToken);
+	public async Task<Response> Get(
+		ReadAllStreamOperation operation,
+		CancellationToken cancellationToken) {
+		if (_useCanonicalUrls && !operation.IsUriCanonical) {
+			return new PermanentRedirectResponse(operation.Self);
+		}
 
-            var streamMessages = page.Messages.OrderByDescending(m => m.Position).ToArray();
+		var page = await operation.Invoke(_streamStore, cancellationToken);
 
-            var payloads = await Task.WhenAll(
-                Array.ConvertAll(
-                    streamMessages,
-                    message => operation.EmbedPayload
-                        ? message.GetJsonData(cancellationToken)
-                        : SkippedPayload.Instance));
+		var streamMessages = page.Messages.OrderByDescending(m => m.Position).ToArray();
 
-            var response = new HalJsonResponse(
-                new HALResponse(new
-                    {
-                        page.FromPosition,
-                        page.NextPosition,
-                        page.IsEnd
-                    })
-                    .AddLinks(
-                        Links
-                            .FromOperation(operation)
-                            .Index()
-                            .Find()
-                            .Browse()
-                            .AllStreamNavigation(page, operation))
-                    .AddEmbeddedCollection(
-                        Constants.Relations.Message,
-                        streamMessages.Zip(
-                            payloads,
-                            (message, payload) => new StreamMessageHALResponse(message, payload)
-                                .AddLinks(
-                                    Links
-                                        .FromOperation(operation)
-                                        .Add(
-                                            Constants.Relations.Message,
-                                            LinkFormatter.StreamMessageByStreamVersion(message.StreamId, message.StreamVersion),
-                                            $"{message.StreamId}@{message.StreamVersion}")
-                                        .Self()
-                                        .Add(
-                                            Constants.Relations.Feed,
-                                            LinkFormatter.Stream(message.StreamId),
-                                            message.StreamId)))));
+		var payloads = await Task.WhenAll(
+			Array.ConvertAll(
+				streamMessages,
+				message => operation.EmbedPayload
+					? message.GetJsonData(cancellationToken)
+					: SkippedPayload.Instance));
 
-            if(operation.FromPositionInclusive == Position.End)
-            {
-                var headPosition = streamMessages.Length > 0
-                    ? streamMessages[0].Position
-                    : Position.End;
+		var response = new HalJsonResponse(
+			new HALResponse(new {
+					page.FromPosition,
+					page.NextPosition,
+					page.IsEnd
+				})
+				.AddLinks(
+					Links
+						.FromOperation(operation)
+						.Index()
+						.Find()
+						.Browse()
+						.AllStreamNavigation(page, operation))
+				.AddEmbeddedCollection(
+					Constants.Relations.Message,
+					streamMessages.Zip(
+						payloads,
+						(message, payload) => new StreamMessageHALResponse(message, payload)
+							.AddLinks(
+								Links
+									.FromOperation(operation)
+									.Add(
+										Constants.Relations.Message,
+										LinkFormatter.StreamMessageByStreamVersion(message.StreamId, message.StreamVersion),
+										$"{message.StreamId}@{message.StreamVersion}")
+									.Self()
+									.Add(
+										Constants.Relations.Feed,
+										LinkFormatter.Stream(message.StreamId),
+										message.StreamId)))));
 
-                response.Headers[Constants.Headers.HeadPosition] = new[] { $"{headPosition}" };
-            }
+		if (operation.FromPositionInclusive == Position.End) {
+			var headPosition = streamMessages.Length > 0
+				? streamMessages[0].Position
+				: Position.End;
 
-            if(page.TryGetETag(operation.FromPositionInclusive, out var eTag))
-            {
-                response.Headers.Add(eTag);
-                response.Headers.Add(CacheControl.NoCache);
-            }
-            else
-            {
-                response.Headers.Add(CacheControl.OneYear);
-            }
+			response.Headers[Constants.Headers.HeadPosition] = new[] { $"{headPosition}" };
+		}
 
-            return response;
-        }
-    }
+		if (page.TryGetETag(operation.FromPositionInclusive, out var eTag)) {
+			response.Headers.Add(eTag);
+			response.Headers.Add(CacheControl.NoCache);
+		} else {
+			response.Headers.Add(CacheControl.OneYear);
+		}
+
+		return response;
+	}
 }

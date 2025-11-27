@@ -1,25 +1,22 @@
-﻿namespace SqlStreamStore.HAL
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
+﻿namespace SqlStreamStore.HAL;
 
-    internal abstract class Response
-    {
-        public int StatusCode { get; }
-        public IDictionary<string, string[]> Headers { get; }
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 
-        protected Response(int statusCode, string mediaType = null)
-        {
-            StatusCode = statusCode;
-            Headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-            {
-                [Constants.Headers.ContentType] = new[] { mediaType }
-            };
-        }
+internal abstract class Response {
+	public int StatusCode { get; }
+	public IDictionary<string, string[]> Headers { get; }
 
-        public abstract Task WriteBody(HttpResponse response, CancellationToken cancellationToken);
-    }
+	protected Response(int statusCode, string? mediaType = null) {
+		StatusCode = statusCode;
+		Headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+		if (mediaType is not null) {
+			Headers[Constants.Headers.ContentType] = new[] { mediaType };
+		}
+	}
+
+	public abstract Task WriteBody(HttpResponse response, CancellationToken cancellationToken);
 }

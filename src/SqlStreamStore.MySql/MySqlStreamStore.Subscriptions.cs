@@ -1,46 +1,46 @@
-namespace SqlStreamStore
-{
-    using System;
-    using SqlStreamStore.Infrastructure;
-    using SqlStreamStore.Subscriptions;
+namespace SqlStreamStore;
 
-    partial class MySqlStreamStore
-    {
-        protected override IStreamSubscription SubscribeToStreamInternal(
-            string streamId,
-            int? startVersion,
-            StreamMessageReceived streamMessageReceived,
-            SubscriptionDropped subscriptionDropped,
-            HasCaughtUp hasCaughtUp,
-            bool prefetchJsonData,
-            string name) => new StreamSubscription(
-            streamId,
-            startVersion,
-            this,
-            GetStoreObservable,
-            streamMessageReceived,
-            subscriptionDropped,
-            hasCaughtUp,
-            prefetchJsonData,
-            name);
+using System;
+using SqlStreamStore.Infrastructure;
+using SqlStreamStore.Subscriptions;
 
-        protected override IAllStreamSubscription SubscribeToAllInternal(
-            long? fromPosition,
-            AllStreamMessageReceived streamMessageReceived,
-            AllSubscriptionDropped subscriptionDropped,
-            HasCaughtUp hasCaughtUp,
-            bool prefetchJsonData,
-            string name)
-            => new AllStreamSubscription(
-                fromPosition,
-                this,
-                GetStoreObservable,
-                streamMessageReceived,
-                subscriptionDropped,
-                hasCaughtUp,
-                prefetchJsonData,
-                name);
+partial class MySqlStreamStore {
+	protected override IStreamSubscription SubscribeToStreamInternal(
+		string streamId,
+		int? startVersion,
+		StreamMessageReceived streamMessageReceived,
+		SubscriptionDropped? subscriptionDropped,
+		HasCaughtUp? hasCaughtUp,
+		bool prefetchJsonData,
+		string? name) => new StreamSubscription(
+		streamId,
+		startVersion,
+		this,
+		GetStoreObservable,
+		streamMessageReceived,
+		subscriptionDropped,
+		hasCaughtUp,
+		prefetchJsonData,
+		name,
+		Logger);
 
-        private IObservable<Unit> GetStoreObservable => _streamStoreNotifier.Value;
-    }
+	protected override IAllStreamSubscription SubscribeToAllInternal(
+		long? fromPosition,
+		AllStreamMessageReceived streamMessageReceived,
+		AllSubscriptionDropped? subscriptionDropped,
+		HasCaughtUp? hasCaughtUp,
+		bool prefetchJsonData,
+		string? name)
+		=> new AllStreamSubscription(
+			fromPosition,
+			this,
+			GetStoreObservable,
+			streamMessageReceived,
+			subscriptionDropped,
+			hasCaughtUp,
+			prefetchJsonData,
+			name,
+			Logger);
+
+	private IObservable<Unit> GetStoreObservable => _streamStoreNotifier.Value;
 }

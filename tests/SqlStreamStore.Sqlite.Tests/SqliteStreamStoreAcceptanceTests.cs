@@ -1,24 +1,14 @@
-namespace SqlStreamStore
-{
-    using System.Threading.Tasks;
-    using Xunit;
-    using Xunit.Abstractions;
+namespace SqlStreamStore;
 
-    public class SqliteStreamStoreAcceptanceTests : AcceptanceTests, IClassFixture<SqliteStreamStoreFixture>
-    {
-        private readonly Task<SqliteStreamStoreFixture> _fixture;
-        
-        public SqliteStreamStoreAcceptanceTests(ITestOutputHelper testOutputHelper, SqliteStreamStoreFixture fixture)
-            : base(testOutputHelper)
-        {
-            _fixture = Task.FromResult<SqliteStreamStoreFixture>(fixture);
-        }
+using System.Threading.Tasks;
+using Meziantou.Xunit;
+using Xunit.Abstractions;
 
-        protected override async Task<IStreamStoreFixture> CreateFixture()
-        {
-            var fixture = await _fixture;
-            await fixture.Prepare();
-            return fixture;
-        }
-    }
+[DisableParallelization]
+public class SqliteStreamStoreAcceptanceTests(ITestOutputHelper testOutputHelper) : AcceptanceTests(testOutputHelper) {
+	protected override async Task<IStreamStoreFixture> CreateFixture() {
+		var fixture = new SqliteStreamStoreFixture(LoggerFactory);
+		await fixture.Prepare();
+		return fixture;
+	}
 }

@@ -1,129 +1,122 @@
-﻿namespace SqlStreamStore
-{
-    using System.Threading.Tasks;
-    using Xunit;
-    using Xunit.Abstractions;
+﻿namespace SqlStreamStore;
 
-    public class MySqlStreamStoreAcceptanceTests : AcceptanceTests, IClassFixture<MySqlStreamStoreFixturePool>
+using System.Threading.Tasks;
+using Meziantou.Xunit;
+using Xunit;
+using Xunit.Abstractions;
+
+[DisableParallelization]
+public class MySqlStreamStoreAcceptanceTests(
+	MySqlStreamStoreFixturePool fixturePool,
+	ITestOutputHelper testOutputHelper)
+	: AcceptanceTests(testOutputHelper), IClassFixture<MySqlStreamStoreFixturePool> {
+	protected override async Task<IStreamStoreFixture> CreateFixture()
+		=> await fixturePool.Get(LoggerFactory);
+
+	/*
+    [Fact]
+    public async Task Can_use_multiple_databases()
     {
-        private readonly MySqlStreamStoreFixturePool _fixturePool;
-
-        public MySqlStreamStoreAcceptanceTests(
-            MySqlStreamStoreFixturePool fixturePool,
-            ITestOutputHelper testOutputHelper)
-            : base(testOutputHelper)
+        using(var dboFixture = await CreateFixture())
+        using(var barFixture = await CreateFixture())
         {
-            _fixturePool = fixturePool;
+            await dboFixture.Store.AppendToStream("stream-1",
+                ExpectedVersion.NoStream,
+                CreateNewStreamMessages(1, 2));
+            await barFixture.Store.AppendToStream("stream-1",
+                ExpectedVersion.NoStream,
+                CreateNewStreamMessages(1, 2));
+
+            var dboHeadPosition = await dboFixture.Store.ReadHeadPosition();
+            var barHeadPosition = await barFixture.Store.ReadHeadPosition();
+
+            dboHeadPosition.ShouldBe(1);
+            barHeadPosition.ShouldBe(1);
         }
+    }
 
-        protected override async Task<IStreamStoreFixture> CreateFixture()
-            => await _fixturePool.Get(TestOutputHelper);
-
-        /*
-        [Fact]
-        public async Task Can_use_multiple_databases()
+    [Fact]
+    public async Task when_try_scavenge_fails_returns_negative_one()
+    {
+        using (var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper))
         {
-            using(var dboFixture = await CreateFixture())
-            using(var barFixture = await CreateFixture())
-            {
-                await dboFixture.Store.AppendToStream("stream-1",
-                    ExpectedVersion.NoStream,
-                    CreateNewStreamMessages(1, 2));
-                await barFixture.Store.AppendToStream("stream-1",
-                    ExpectedVersion.NoStream,
-                    CreateNewStreamMessages(1, 2));
+            var cts = new CancellationTokenSource();
 
-                var dboHeadPosition = await dboFixture.Store.ReadHeadPosition();
-                var barHeadPosition = await barFixture.Store.ReadHeadPosition();
+            cts.Cancel();
 
-                dboHeadPosition.ShouldBe(1);
-                barHeadPosition.ShouldBe(1);
-            }
+            var result = await fixture.Store.TryScavenge(new StreamIdInfo("stream-1"), cts.Token);
+
+            result.ShouldBe(-1);
         }
-
-        [Fact]
-        public async Task when_try_scavenge_fails_returns_negative_one()
+    }
+    [Fact]
+    public async Task Can_call_initialize_repeatably()
+    {
+        using(var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper, false))
         {
-            using (var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper))
-            {
-                var cts = new CancellationTokenSource();
-
-                cts.Cancel();
-
-                var result = await fixture.Store.TryScavenge(new StreamIdInfo("stream-1"), cts.Token);
-
-                result.ShouldBe(-1);
-            }
+            await fixture.Store.CreateSchemaIfNotExists();
+            await fixture.Store.CreateSchemaIfNotExists();
         }
-        [Fact]
-        public async Task Can_call_initialize_repeatably()
+    }
+
+    [Fact]
+    public async Task Can_drop_all()
+    {
+        var streamStoreObjects = new List<string>();
+
+        using(var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper))
         {
-            using(var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper, false))
-            {
-                await fixture.Store.CreateSchemaIfNotExists();
-                await fixture.Store.CreateSchemaIfNotExists();
-            }
-        }
+            string ReadInformationSchema((string name, string table) _)
+                => $"SELECT {_.name}_name FROM information_schema.{_.table} WHERE {_.name}_schema = '{fixture.DatabaseName}'";
 
-        [Fact]
-        public async Task Can_drop_all()
-        {
-            var streamStoreObjects = new List<string>();
+            await fixture.Store.DropAll();
 
-            using(var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper))
-            {
-                string ReadInformationSchema((string name, string table) _)
-                    => $"SELECT {_.name}_name FROM information_schema.{_.table} WHERE {_.name}_schema = '{fixture.DatabaseName}'";
-
-                await fixture.Store.DropAll();
-
-                var commandText = string.Join(
-                    $"{Environment.NewLine}UNION{Environment.NewLine}",
-                    new[]
-                    {
-                        ("table", "tables"),
-                        ("constraint", "table_constraints"),
-                        ("routine", "routines")
-                    }.Select(ReadInformationSchema));
-
-                using(var connection = new MySqlConnection(fixture.ConnectionString))
+            var commandText = string.Join(
+                $"{Environment.NewLine}UNION{Environment.NewLine}",
+                new[]
                 {
-                    await connection.OpenAsync().ConfigureAwait(false);
+                    ("table", "tables"),
+                    ("constraint", "table_constraints"),
+                    ("routine", "routines")
+                }.Select(ReadInformationSchema));
 
-                    using(var command = new MySqlCommand(commandText, connection))
-                    using(var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
+            using(var connection = new MySqlConnection(fixture.ConnectionString))
+            {
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                using(var command = new MySqlCommand(commandText, connection))
+                using(var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
+                {
+                    while(await reader.ReadAsync().ConfigureAwait(false))
                     {
-                        while(await reader.ReadAsync().ConfigureAwait(false))
-                        {
-                            streamStoreObjects.Add(reader.GetString(0));
-                        }
+                        streamStoreObjects.Add(reader.GetString(0));
                     }
                 }
-
-                streamStoreObjects.ShouldBeEmpty();
             }
+
+            streamStoreObjects.ShouldBeEmpty();
         }
-
-        [Fact]
-        public async Task Can_check_schema()
-        {
-            using(var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper))
-            {
-                var result = await fixture.Store.CheckSchema();
-
-                result.ShouldBe(new CheckSchemaResult(1, 1));
-                result.IsMatch.ShouldBeTrue();
-            }
-        }
-
-        [Fact]
-        public void Can_export_database_creation_script()
-        {
-            var store = new MySqlStreamStore(new MySqlStreamStoreSettings("server=.;database=sss"));
-
-            var sqlScript = store.GetSchemaCreationScript();
-            sqlScript.ShouldBe(new Scripts().CreateSchema);
-        }
-        */
     }
+
+    [Fact]
+    public async Task Can_check_schema()
+    {
+        using(var fixture = await MySqlStreamStoreFixture.Create(TestOutputHelper))
+        {
+            var result = await fixture.Store.CheckSchema();
+
+            result.ShouldBe(new CheckSchemaResult(1, 1));
+            result.IsMatch.ShouldBeTrue();
+        }
+    }
+
+    [Fact]
+    public void Can_export_database_creation_script()
+    {
+        var store = new MySqlStreamStore(new MySqlStreamStoreSettings("server=.;database=sss"));
+
+        var sqlScript = store.GetSchemaCreationScript();
+        sqlScript.ShouldBe(new Scripts().CreateSchema);
+    }
+    */
 }

@@ -1,27 +1,24 @@
-﻿namespace SqlStreamStore.Internal.HoneyBearHalClient
-{
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
+﻿namespace SqlStreamStore.Internal.HoneyBearHalClient;
 
-    internal static class HalClientRootExtensions
-    {
-        public static Task<IHalClient> RootAsync(
-            this IHalClient client,
-            string href,
-            CancellationToken cancellationToken = default) =>
-            client.ExecuteAsync(href, uri => client.Client.GetAsync(uri, cancellationToken));
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
-        public static bool Has(this IHalClient client, string rel) =>
-            client.Has(rel, null);
+internal static class HalClientRootExtensions {
+	public static Task<IHalClient> RootAsync(
+		this IHalClient client,
+		string href,
+		CancellationToken cancellationToken = default) =>
+		client.ExecuteAsync(href, uri => client.Client.GetAsync(uri, cancellationToken));
 
-        public static bool Has(this IHalClient client, string rel, string curie)
-        {
-            var relationship = HalClientExtensions.Relationship(rel, curie);
+	public static bool Has(this IHalClient client, string rel) =>
+		client.Has(rel, null);
 
-            return
-                client.Current.Any(r => r.Embedded.Any(e => e.Rel == relationship))
-                || client.Current.Any(r => r.Links.Any(l => l.Rel == relationship));
-        }
-    }
+	public static bool Has(this IHalClient client, string rel, string? curie) {
+		var relationship = HalClientExtensions.Relationship(rel, curie);
+
+		return
+			client.Current.Any(r => r.Embedded.Any(e => e.Rel == relationship))
+			|| client.Current.Any(r => r.Links.Any(l => l.Rel == relationship));
+	}
 }

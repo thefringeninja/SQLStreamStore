@@ -1,54 +1,48 @@
-namespace SqlStreamStore.HAL.StreamBrowser
-{
-    using System.Threading;
-    using System.Threading.Tasks;
-    using Microsoft.AspNetCore.Http;
-    using SqlStreamStore.Streams;
+namespace SqlStreamStore.HAL.StreamBrowser;
 
-    internal class ListStreamsOperation : IStreamStoreOperation<ListStreamsPage>
-    {
-        public Pattern Pattern { get; }
-        public string ContinuationToken { get; }
-        public int MaxCount { get; }
-        public string PatternType { get; }
-        public PathString Path { get; }
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using SqlStreamStore.Streams;
 
-        public ListStreamsOperation(HttpContext context)
-        {
-            var request = context.Request;
-            Path = request.Path;
-            if(request.Query.TryGetValueCaseInsensitive('t', out var patternType))
-            {
-                PatternType = patternType;
-            }
+internal class ListStreamsOperation : IStreamStoreOperation<ListStreamsPage> {
+	public Pattern Pattern { get; }
+	public string? ContinuationToken { get; }
+	public int MaxCount { get; }
+	public string? PatternType { get; }
+	public PathString Path { get; }
 
-            request.Query.TryGetValueCaseInsensitive('p', out var pattern);
+	public ListStreamsOperation(HttpContext context) {
+		var request = context.Request;
+		Path = request.Path;
+		if (request.Query.TryGetValueCaseInsensitive('t', out var patternType)) {
+			PatternType = patternType;
+		}
 
-            switch(PatternType)
-            {
-                case "s":
-                    Pattern = Pattern.StartsWith(pattern);
-                    break;
-                case "e":
-                    Pattern = Pattern.EndsWith(pattern);
-                    break;
-                default:
-                    Pattern = Pattern.Anything();
-                    break;
-            }
+		request.Query.TryGetValueCaseInsensitive('p', out var pattern);
 
-            if(request.Query.TryGetValueCaseInsensitive('c', out var continuationToken))
-            {
-                ContinuationToken = continuationToken;
-            }
+		switch (PatternType) {
+			case "s":
+				Pattern = Pattern.StartsWith(pattern);
+				break;
+			case "e":
+				Pattern = Pattern.EndsWith(pattern);
+				break;
+			default:
+				Pattern = Pattern.Anything();
+				break;
+		}
 
-            MaxCount = request.Query.TryGetValueCaseInsensitive('m', out var m)
-                       && int.TryParse(m, out var maxCount)
-                ? maxCount
-                : 100;
-        }
+		if (request.Query.TryGetValueCaseInsensitive('c', out var continuationToken)) {
+			ContinuationToken = continuationToken;
+		}
 
-        public Task<ListStreamsPage> Invoke(IStreamStore streamStore, CancellationToken cancellationToken)
-            => streamStore.ListStreams(Pattern, MaxCount, ContinuationToken, cancellationToken);
-    }
+		MaxCount = request.Query.TryGetValueCaseInsensitive('m', out var m)
+		           && int.TryParse(m, out var maxCount)
+			? maxCount
+			: 100;
+	}
+
+	public Task<ListStreamsPage> Invoke(IStreamStore streamStore, CancellationToken cancellationToken)
+		=> streamStore.ListStreams(Pattern, MaxCount, ContinuationToken, cancellationToken);
 }

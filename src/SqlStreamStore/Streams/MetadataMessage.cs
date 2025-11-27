@@ -1,28 +1,26 @@
-namespace SqlStreamStore.Streams
-{
-    /// <summary>
-    ///     Represents a streams metadata.
-    /// </summary>
-    public class MetadataMessage
-    {
-        /// <summary>
-        /// The Stream Id.
-        /// </summary>
-        public string StreamId;
+namespace SqlStreamStore.Streams;
 
-        /// <summary>
-        /// The max age of messages retained in the stream.
-        /// </summary>
-        public int? MaxAge;
+/// <summary>
+///     Represents a streams metadata.
+/// </summary>
+public class MetadataMessage {
+	/// <summary>
+	/// The Stream Id.
+	/// </summary>
+	public required string StreamId;
 
-        /// <summary>
-        /// The max count of message retained in the stream.
-        /// </summary>
-        public int? MaxCount;
+	/// <summary>
+	/// The max age of messages retained in the stream.
+	/// </summary>
+	public int? MaxAge;
 
-        /// <summary>
-        /// Custom Json 
-        /// </summary>
-        public string MetaJson;
-    }
+	/// <summary>
+	/// The max count of message retained in the stream.
+	/// </summary>
+	public int? MaxCount;
+
+	/// <summary>
+	/// Custom Json 
+	/// </summary>
+	public string? MetaJson;
 }
